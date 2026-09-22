@@ -1,0 +1,20 @@
+{
+  "name": "pyco2sys-dev",
+  "version": "0.1.0",
+  "description": "Development toolkit for the reproducible coastal carbonate chemistry / ocean acidification platform. Provides PyCO2SYS usage knowledge, marine carbonate chemistry domain context, and the discrete chemical oceanography data standard for schema, QC, and export work.",
+  "author": {
+    "name": "Vraj Rajpura",
+    "email": "vrajr@uw.edu"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pyco2sys",
+    "ocean-acidification",
+    "carbonate-chemistry",
+    "oceanography",
+    "data-standards",
+    "reproducibility",
+    "python",
+    "scientific-computing"
+  ]
+}

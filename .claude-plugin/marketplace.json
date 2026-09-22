@@ -1,0 +1,14 @@
+{
+  "name": "roap-local",
+  "owner": {
+    "name": "Vraj Rajpura",
+    "email": "vrajr@uw.edu"
+  },
+  "plugins": [
+    {
+      "name": "pyco2sys-dev",
+      "source": "./plugins/pyco2sys-dev",
+      "description": "Development toolkit for the reproducible coastal carbonate chemistry / ocean acidification platform. Provides PyCO2SYS usage knowledge, marine carbonate chemistry domain context, and the discrete chemical oceanography data standard for schema, QC, and export work."
+    }
+  ]
+}
