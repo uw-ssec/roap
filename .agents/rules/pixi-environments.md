@@ -30,6 +30,7 @@ pixi install
 # This installs:
 # - pre-commit (>=4.3.0)
 # - gh (GitHub CLI, >=2.0.0)
+# - okf-agent-memory (>=0.4.0,<0.5) — provides the `okf` CLI
 # - Creates .pixi/envs/default directory
 ```
 
@@ -38,7 +39,7 @@ command is idempotent and safe to run multiple times.
 
 ## Available Environments
 
-1. **`default`** (features: `pre-commit`, `gh-cli`)
+1. **`default`** (features: `pre-commit`, `gh-cli`, `okf`)
 
    - Standard development environment
    - Use for: general development, running pre-commit checks
@@ -46,7 +47,32 @@ command is idempotent and safe to run multiple times.
 2. **`onboard`** (features: `pre-commit`, `gh-cli`, `onboard`)
    - Extended environment with onboarding tools
    - Includes: ssec-cli (installed from GitHub)
+   - Does **not** include the `okf` feature
    - Use for: first-time setup, onboarding new contributors
+
+## Channels
+
+```toml
+channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"]
+```
+
+`conda-forge` (the bare name, resolving via anaconda.org) is listed first and
+wins for any package/platform combination it has. The SSEC channel is a
+**per-platform fallback**, not a mirror: `okf-agent-memory`'s conda-forge
+feedstock currently only builds `linux-64`/`osx-64`/`win-64`, so `osx-arm64` and
+`linux-aarch64` (both in this workspace's `platforms`) fall through to
+`https://prefix.dev/lsetiawan/uw-ssec`, which does publish those. Channel
+priority in pixi operates per platform, not globally — a channel missing a build
+for one platform doesn't block it from supplying another.
+
+This means the same dependency can resolve to different versions on different
+platforms (currently `okf-agent-memory` 0.4.4 on `linux-64` from conda-forge,
+0.4.0 on `osx-arm64`/`linux-aarch64` from the SSEC channel) — check `pixi.lock`
+if a platform-specific version discrepancy matters.
+
+Channel changes invalidate `pixi.lock` and force a full re-solve against current
+repodata, which can bump unrelated packages. Check the lockfile diff for
+incidental version changes before committing.
 
 ## Adding Dependencies
 
@@ -64,12 +90,22 @@ pixi add --feature <feature-name> <package-name>
 pixi install
 ```
 
+To pull a package from a channel that is not yet in the workspace, register the
+channel first, then scope the spec with `channel::package`. There is no
+`--channel` flag on `pixi add`:
+
+```bash
+pixi workspace channel add https://prefix.dev/<owner>/<channel>
+pixi add "https://prefix.dev/<owner>/<channel>::<package-name>"
+```
+
 Adding a dependency to this template needs justification — see
 [contribution-discipline.md](contribution-discipline.md).
 
 ## pixi.toml Structure
 
-- **`[workspace]`**: Project metadata (name, version, authors, platforms)
+- **`[workspace]`**: Project metadata (name, version, authors, platforms,
+  channels)
 - **`[environments]`**: Named environments with feature sets
 - **`[dependencies]`**: Conda dependencies for all environments
 - **`[pypi-dependencies]`**: PyPI dependencies for all environments
@@ -84,6 +120,8 @@ Run `pixi task list` to see all available tasks:
 - `pre-commit-install`: Install git hooks
 - `pre-commit`: Run checks on staged files
 - `pre-commit-all`: Run checks on all files
+- `okf-validate`: Validate the OKF knowledge bundle (`knowledge/`)
+- `okf-search`: Search the OKF knowledge bundle (`pixi run okf-search <query>`)
 - `ssec-setup`: Set up ssec CLI completion (onboard env only)
 - `onboard`: Full onboarding process (onboard env only)
 
@@ -92,9 +130,35 @@ Run `pixi task list` to see all available tasks:
 ```bash
 # Check GitHub CLI version
 pixi run gh --version
-# ✓ Should show v2.81.0 or higher
+# ✓ Should show v2.81.0 or higher (currently v2.101.0)
 
 # Use GitHub CLI for any repo operations
 pixi run gh <command>
 # Examples: gh issue list, gh pr create, etc.
 ```
+
+## OKF Agent Memory Usage
+
+`okf-agent-memory` is supplied by the `okf` feature rather than the top-level
+`[dependencies]`, so a downstream project can drop it by removing `"okf"` from
+the `default` environment's feature list. It is available in `default` but not
+in `onboard`.
+
+The package installs a binary named **`okf`**, not `okf-agent-memory`:
+
+```bash
+# Check the OKF CLI version
+pixi run okf version
+# ✓ Should show 0.4.0 (OKF v0.2 specification) or higher
+
+pixi run okf --help
+```
+
+It backs the optional knowledge-bundle pattern described in
+[mkdocs-okf-knowledge-bundle.md](mkdocs-okf-knowledge-bundle.md).
+
+A bundle is already scaffolded at `knowledge/` (`index.md`, `log.md`), and the
+`.agents/skills/okf-memory/` skill teaches agents the `okf_search` /
+`okf_create` / `okf_update` / `okf_validate` workflow. Run
+`pixi run okf-validate` after any manual edit under `knowledge/`. mkdocs is not
+wired in — the bundle is agent memory only, not (yet) a rendered docs site.

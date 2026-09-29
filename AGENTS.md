@@ -30,15 +30,16 @@ These apply to every task, in every session:
 
 Load the rule file whose trigger matches what you are about to do.
 
-| Rule file                                                              | Load when                                                                  |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [working-agreement.md](.agents/rules/working-agreement.md)             | Starting any implementation, refactor, or bugfix — the behavioral baseline |
-| [contribution-discipline.md](.agents/rules/contribution-discipline.md) | About to commit, open a PR, or asked to "contribute" / "fix some issues"   |
-| [pixi-environments.md](.agents/rules/pixi-environments.md)             | Running any command, adding a dependency, or editing `pixi.toml`           |
-| [pre-commit-and-quality.md](.agents/rules/pre-commit-and-quality.md)   | Committing, preparing a PR, or claiming checks pass                        |
-| [repository-map.md](.agents/rules/repository-map.md)                   | You need to know what this repo is, where a file lives, or what CI runs    |
-| [onboarding.md](.agents/rules/onboarding.md)                           | First-time setup, or helping a new contributor get started                 |
-| [troubleshooting.md](.agents/rules/troubleshooting.md)                 | A documented command fails or behaves unexpectedly                         |
+| Rule file                                                                      | Load when                                                                                   |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| [working-agreement.md](.agents/rules/working-agreement.md)                     | Starting any implementation, refactor, or bugfix — the behavioral baseline                  |
+| [contribution-discipline.md](.agents/rules/contribution-discipline.md)         | About to commit, open a PR, or asked to "contribute" / "fix some issues"                    |
+| [pixi-environments.md](.agents/rules/pixi-environments.md)                     | Running any command, adding a dependency, or editing `pixi.toml`                            |
+| [pre-commit-and-quality.md](.agents/rules/pre-commit-and-quality.md)           | Committing, preparing a PR, or claiming checks pass                                         |
+| [repository-map.md](.agents/rules/repository-map.md)                           | You need to know what this repo is, where a file lives, or what CI runs                     |
+| [onboarding.md](.agents/rules/onboarding.md)                                   | First-time setup, or helping a new contributor get started                                  |
+| [troubleshooting.md](.agents/rules/troubleshooting.md)                         | A documented command fails or behaves unexpectedly                                          |
+| [mkdocs-okf-knowledge-bundle.md](.agents/rules/mkdocs-okf-knowledge-bundle.md) | Setting up mkdocs to render an OKF-managed knowledge bundle in this repo (optional pattern) |
 
 ## Provenance
 

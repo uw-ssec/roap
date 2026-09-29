@@ -1,14 +1,14 @@
 [workspace]
 # Project metadata and basic configuration
 authors = ["University of Washington Scientific Software Engineering Center"] # Project authors
-channels = ["conda-forge"] # Conda channels for dependencies
+channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"] # Conda channels for dependencies; okf-agent-memory falls back to the second channel on platforms conda-forge doesn't build yet (osx-arm64, linux-aarch64)
 name = "project-template" # Project name
-platforms = ["osx-arm64"] # Supported platforms for development and deployment
+platforms = ["osx-arm64", "linux-64", "linux-aarch64"] # Supported platforms for development and deployment
 version = "0.1.0" # Project version
 
 # The environment configurations for different development scenarios
 [environments]
-default = { features = ["pre-commit", "gh-cli"], solve-group = "default" } # The default development environment with pre-commit and GitHub CLI
+default = { features = ["pre-commit", "gh-cli", "okf"], solve-group = "default" } # The default development environment with pre-commit, GitHub CLI, and OKF agent memory
 onboard = { features = ["pre-commit", "gh-cli", "onboard"], solve-group = "default" } # The onboarding environment with additional setup tasks
 
 # The project dependencies
@@ -23,6 +23,14 @@ onboard = { features = ["pre-commit", "gh-cli", "onboard"], solve-group = "defau
 # GitHub CLI feature for interacting with GitHub from the command line
 [feature.gh-cli.dependencies]
 gh = ">=2.0.0"
+
+# OKF feature providing the `okf` agent-memory CLI
+[feature.okf.dependencies]
+okf-agent-memory = ">=0.4.0,<0.5"
+
+[feature.okf.tasks]
+okf-validate = { cmd = "okf validate knowledge --strict --drift", description = "Validate the OKF knowledge bundle" }
+okf-search = { cmd = "okf search", description = "Search the OKF knowledge bundle: pixi run okf-search <query>" }
 
 # Pre-commit feature for code quality and consistency
 [feature.pre-commit.dependencies]
