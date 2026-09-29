@@ -113,6 +113,8 @@ Run `pixi task list` to see all available tasks:
 - `pre-commit-install`: Install git hooks
 - `pre-commit`: Run checks on staged files
 - `pre-commit-all`: Run checks on all files
+- `okf-validate`: Validate the OKF knowledge bundle (`knowledge/`)
+- `okf-search`: Search the OKF knowledge bundle (`pixi run okf-search <query>`)
 - `ssec-setup`: Set up ssec CLI completion (onboard env only)
 - `onboard`: Full onboarding process (onboard env only)
 
@@ -147,3 +149,9 @@ pixi run okf --help
 
 It backs the optional knowledge-bundle pattern described in
 [mkdocs-okf-knowledge-bundle.md](mkdocs-okf-knowledge-bundle.md).
+
+A bundle is already scaffolded at `knowledge/` (`index.md`, `log.md`), and the
+`.agents/skills/okf-memory/` skill teaches agents the `okf_search` /
+`okf_create` / `okf_update` / `okf_validate` workflow. Run
+`pixi run okf-validate` after any manual edit under `knowledge/`. mkdocs is not
+wired in — the bundle is agent memory only, not (yet) a rendered docs site.

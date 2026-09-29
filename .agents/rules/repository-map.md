@@ -36,6 +36,7 @@ no application code — it serves as a starting point for new projects.
 │   ├── workflows/               # GitHub Actions (zizmor workflow linting, Copilot agent setup)
 │   └── ISSUE_TEMPLATE/          # Issue templates (bug, feature, docs, onboard, etc.)
 ├── .pre-commit-config.yaml      # Pre-commit hook configuration
+├── knowledge/                   # OKF v0.2 agent-memory bundle (index.md, log.md, concepts)
 ├── pixi.toml                    # **PRIMARY CONFIG**: Dependencies, tasks, features
 ├── pixi.lock                    # Lock file (auto-generated, don't manually edit)
 ├── .gitignore                   # Ignores .pixi/ and .DS_Store

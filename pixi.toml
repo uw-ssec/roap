@@ -28,6 +28,10 @@ gh = ">=2.0.0"
 [feature.okf.dependencies]
 okf-agent-memory = { version = ">=0.4.0,<0.5", channel = "https://prefix.dev/lsetiawan/uw-ssec" }
 
+[feature.okf.tasks]
+okf-validate = { cmd = "okf validate knowledge --strict --drift", description = "Validate the OKF knowledge bundle" }
+okf-search = { cmd = "okf search", description = "Search the OKF knowledge bundle: pixi run okf-search <query>" }
+
 # Pre-commit feature for code quality and consistency
 [feature.pre-commit.dependencies]
 pre-commit = ">=4.3.0"
