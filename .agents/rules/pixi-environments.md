@@ -52,16 +52,23 @@ command is idempotent and safe to run multiple times.
 
 ## Channels
 
-Conda packages resolve from two channels, both hosted on prefix.dev:
+```toml
+channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"]
+```
 
-- `https://prefix.dev/conda-forge` — the prefix.dev mirror of conda-forge.
-- `https://prefix.dev/lsetiawan/uw-ssec` — the SSEC channel, which publishes
-  `okf-agent-memory`.
+`conda-forge` (the bare name, resolving via anaconda.org) is listed first and
+wins for any package/platform combination it has. The SSEC channel is a
+**per-platform fallback**, not a mirror: `okf-agent-memory`'s conda-forge
+feedstock currently only builds `linux-64`/`osx-64`/`win-64`, so `osx-arm64` and
+`linux-aarch64` (both in this workspace's `platforms`) fall through to
+`https://prefix.dev/lsetiawan/uw-ssec`, which does publish those. Channel
+priority in pixi operates per platform, not globally — a channel missing a build
+for one platform doesn't block it from supplying another.
 
-The mirror is listed **instead of** the bare `conda-forge` name, not alongside
-it. Listing both is a no-op: channel priority means the anaconda.org copy wins
-every time and the mirror is never consulted. If you re-add `conda-forge` by
-name, the mirror stops taking effect.
+This means the same dependency can resolve to different versions on different
+platforms (currently `okf-agent-memory` 0.4.4 on `linux-64` from conda-forge,
+0.4.0 on `osx-arm64`/`linux-aarch64` from the SSEC channel) — check `pixi.lock`
+if a platform-specific version discrepancy matters.
 
 Channel changes invalidate `pixi.lock` and force a full re-solve against current
 repodata, which can bump unrelated packages. Check the lockfile diff for
