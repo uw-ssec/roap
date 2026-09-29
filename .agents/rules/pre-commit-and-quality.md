@@ -38,8 +38,10 @@ To check a specific file, pass it through the task:
 - codespell (spell checking)
 - Disallow improper capitalization (e.g., incorrect → correct)
 - Validate Dependabot config and GitHub workflows
+- detect-secrets (blocks new secrets against `.secrets.baseline`)
 
-**Files Excluded from Pre-commit:** `pixi.lock`, `onboarded.md`
+**Files Excluded from Pre-commit:** `pixi.lock`, `onboarded.md`,
+`.secrets.baseline`
 
 ## Making Changes: Validated Workflow
 
