@@ -4,3 +4,9 @@
 
 # MacOS
 .DS_Store
+
+# Claude Code local settings (contains auth token)
+.claude/settings.json
+
+# Local scratch/reference material (may contain unpublished research data)
+local/
