@@ -1,6 +1,8 @@
 # ROAP — AI-Friendly Product Requirements Document
 ## Reproducible Ocean Acidification Pipeline (v1.0.0)
 
+> **Note:** The `oa_pipeline` v0.2.0 prototype lives in a separate repository. For migration (P-1), add it as a git submodule: `git submodule add <prototype-repo-url> prototype/oa_pipeline`. References below use `prototype/oa_pipeline/` paths.
+
 ---
 
 ## 1. Objective
@@ -20,13 +22,13 @@ Build a **production-grade, cross-platform, citable platform** for ocean acidifi
 
 | Phase | Milestone | Target | Duration | Gate |
 |-------|-----------|--------|----------|------|
-| **P-1** | Prototype Migration Complete | Week 1 | 2–3 days | 221 tests pass; pipeline runs on synthetic data |
-| **P0** | Cross-Platform CI + Invariant Test + Single Entry Point | Week 2 | 3–4 days | CI green on Ubuntu/macOS/Windows + invariant test fails on column mutation |
-| **P1** | Tagged Release v0.2.0 + Run Bundles + Config Gate | Week 3 | 3–4 days | `pip install oa-pipeline==0.2.0` works; config gate enforced; run bundles produced |
-| **P2** | Schema/Provenance/CRM/Excel Fixes + Property Tests | Week 4–5 | 5–7 days | Frontiers 2021 audit complete; Excel round-trip fixed; CRM/std validation fails fast; hypothesis tests in CI |
-| **P4** | ADR 0001 Decided (Queryable Layer Scope) | Week 5 | 1 day | ADR written, reviewed, decided |
-| **P3** | GOA-ON Export + Pre-Flight Validation + Manual Regression | Week 6–7 | 5–7 days | Pre-flight CLI/GUI works; GOA-ON export valid; April 2026 dataset → 22/16/0 |
-| **v1.0.0** | **Tagged Release v1.0.0** | Week 8 | — | All Definition of Done criteria met |
+| **P-1** | Prototype Migration Complete | Week 1–2 | 5–7 days | 221 tests pass; pipeline runs on synthetic data |
+| **P0** | Cross-Platform CI + Invariant Test + Single Entry Point | Week 3–4 | 5–7 days | CI green on Ubuntu/macOS/Windows + invariant test fails on column mutation |
+| **P1** | Tagged Release v0.2.0 + Run Bundles + Config Gate | Week 5–6 | 5–7 days | `pip install oa-pipeline==0.2.0` works; config gate enforced; run bundles produced |
+| **P2** | Schema/Provenance/CRM/Excel Fixes + Property Tests | Week 7–9 | 10–14 days | Frontiers 2021 audit complete; Excel round-trip fixed; CRM/std validation fails fast; hypothesis tests in CI |
+| **P4** | ADR 0001 Decided (Queryable Layer Scope) | Week 9 | 2–3 days | ADR written, reviewed, decided |
+| **P3** | GOA-ON Export + Pre-Flight Validation + Manual Regression | Week 10–11 | 7–10 days | Pre-flight CLI/GUI works; GOA-ON export valid; April 2026 dataset → 22/16/0 |
+| **v1.0.0** | **Tagged Release v1.0.0** | Week 12 | — | All Definition of Done criteria met |
 
 ### Milestone Dependencies
 
@@ -39,6 +41,8 @@ P-1 (BLOCKING)
     │
     └─── P4 gates P3 export design
 ```
+
+**Total: 12 weeks (3 months)** with buffers for cross-platform CI flakiness, schema audit iteration, and ADR decision latency.
 
 ---
 
@@ -75,9 +79,11 @@ P-1 (BLOCKING)
 
 ## 5. Relevant Code Paths
 
-### Prototype Location (Source of Truth for Migration)
+### Prototype Location (Source of Truth for Migration — Git Submodule)
+Add as submodule: `git submodule add <prototype-repo-url> references/prototype/oa_pipeline`
+
 ```
-local/prototype/my_understanding/test/oa_pipeline/
+references/prototype/oa_pipeline/
 ├── src/oa_pipeline/          # 12 modules — CORE LOGIC
 │   ├── __init__.py           # v0.2.0, public API re-exports
 │   ├── common.py             # Paths, I/O, coalescing, flags, manifests
@@ -224,12 +230,12 @@ roap/
 
 | Component | Location | Notes |
 |-----------|----------|-------|
-| **Prototype pipeline** | `local/prototype/my_understanding/test/oa_pipeline/` | Full v0.2.0 with 221 tests, 8 notebooks, `.venv_run/` — **source for P-1 migration** |
-| **Carbonate chemistry knowledge** | `local/prototype/my_understanding/test/docs/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md` | Authoritative domain reference; update first, propagate to skills |
-| **Data standard reference** | `local/reference/data-standard.md` | Frontiers 2021 quick reference for schema alignment |
-| **Architecture decisions** | `local/decisions/architecture-decisions.md` | 10 ADRs (6 accepted, 4 proposed) |
-| **Council review** | `local/decisions/council-review.md` | 4-voice review that reshaped epic (added P-1, merged P0+invariant, moved P4 before P3) |
-| **Personas & user stories** | `local/personas/user-stories.md` | 24 stories mapped to epics with acceptance criteria |
+| **Prototype pipeline** | `references/prototype/oa_pipeline/` (git submodule) | Full v0.2.0 with 221 tests, 8 notebooks, `.venv_run/` — **source for P-1 migration** |
+| **Carbonate chemistry knowledge** | `references/prototype/oa_pipeline/docs/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md` | Authoritative domain reference; update first, propagate to skills |
+| **Data standard reference** | `references/data-standard.md` | Frontiers 2021 quick reference for schema alignment |
+| **Architecture decisions** | `references/decisions/architecture-decisions.md` | 10 ADRs (6 accepted, 4 proposed) |
+| **Council review** | `references/decisions/council-review.md` | 4-voice review that reshaped epic (added P-1, merged P0+invariant, moved P4 before P3) |
+| **Personas & user stories** | `references/personas/user-stories.md` | 24 stories mapped to epics with acceptance criteria |
 | **Skills (ECC)** | `.agents/skills/` | `carbonate-chemistry`, `data-standard`, `pyco2sys-usage`, `tdd-workflow`, `pre-commit-and-quality`, `verification-loop`, etc. |
 
 ---
@@ -305,4 +311,4 @@ roap/
 
 ---
 
-*Generated from `epic.md`, council review (`local/decisions/council-review.md`), architecture decisions (`local/decisions/architecture-decisions.md`), prototype codebase (`local/prototype/`), and domain references. Update `CARBONATE_CHEMISTRY_KNOWLEDGE.md` first when domain decisions change, then propagate to skills.*
+*Generated from `epic.md`, council review (`references/decisions/council-review.md`), architecture decisions (`references/decisions/architecture-decisions.md`), prototype codebase (`references/prototype/oa_pipeline/` as git submodule), and domain references. Update `CARBONATE_CHEMISTRY_KNOWLEDGE.md` first when domain decisions change, then propagate to skills.*
