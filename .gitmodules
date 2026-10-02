@@ -1,0 +1,3 @@
+[submodule "references/prototype/oa_pipeline"]
+	path = references/prototype/oa_pipeline
+	url = https://github.com/reez-png/oa_pipeline
