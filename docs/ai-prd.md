@@ -231,8 +231,8 @@ roap/
 | Component | Location | Notes |
 |-----------|----------|-------|
 | **Prototype pipeline** | `references/prototype/oa_pipeline/` (git submodule) | Full v0.2.0 with 221 tests, 8 notebooks, `.venv_run/` — **source for P-1 migration** |
-| **Carbonate chemistry knowledge** | `references/prototype/oa_pipeline/docs/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md` | Authoritative domain reference; update first, propagate to skills |
-| **Data standard reference** | `references/data-standard.md` | Frontiers 2021 quick reference for schema alignment |
+| **Carbonate chemistry knowledge** | `references/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md` | Authoritative domain reference; update first, propagate to skills |
+| **Data standard reference** | `references/reference/data-standard.md` | Frontiers 2021 quick reference for schema alignment |
 | **Architecture decisions** | `references/decisions/architecture-decisions.md` | 10 ADRs (6 accepted, 4 proposed) |
 | **Council review** | `references/decisions/council-review.md` | 4-voice review that reshaped epic (added P-1, merged P0+invariant, moved P4 before P3) |
 | **Personas & user stories** | `references/personas/user-stories.md` | 24 stories mapped to epics with acceptance criteria |
@@ -311,4 +311,4 @@ roap/
 
 ---
 
-*Generated from `epic.md`, council review (`references/decisions/council-review.md`), architecture decisions (`references/decisions/architecture-decisions.md`), prototype codebase (`references/prototype/oa_pipeline/` as git submodule), and domain references. Update `CARBONATE_CHEMISTRY_KNOWLEDGE.md` first when domain decisions change, then propagate to skills.*
+*Generated from `epic.md`, council review (`references/decisions/council-review.md`), architecture decisions (`references/decisions/architecture-decisions.md`), prototype codebase (`references/prototype/oa_pipeline/` as git submodule), and domain references (`references/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md`, `references/reference/data-standard.md`). Update `references/domain-knowledge/CARBONATE_CHEMISTRY_KNOWLEDGE.md` first when domain decisions change, then propagate to skills.*
