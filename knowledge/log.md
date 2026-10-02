@@ -1,4 +1,16 @@
 ## 2026-10-02
+* **Update**: Linked `project/epic.md` to `prototype/requested-dataset.md` (Epic references real dataset for manual regression gate P3.4).
+* **Update**: Linked `project/epic.md` to `prototype/prototype-readme.md` (Epic references prototype README for P-1 migration).
+* **Update**: Linked `project/epic.md` to `prototype/notebook-readmes.md` (Epic references notebook structure for P-1 migration).
+* **Update**: Linked `project/epic.md` to `prototype/duplicate-precision-methods.md` (Epic references duplicate precision methods for P2).
+* **Update**: Linked `project/epic.md` to `prototype/carbonate-methods-note.md` (Epic references carbonate methods for P2).
+* **Update**: Linked `project/epic.md` to `prototype/carbonate-calc-design.md` (Epic references carbonate calculation design for P2).
+* **Creation**: Documented concept `prototype/requested-dataset.md` (Requested Dataset (April 2026)).
+* **Creation**: Documented concept `prototype/notebook-readmes.md` (Notebook READMEs (Consolidated)).
+* **Creation**: Documented concept `prototype/prototype-readme.md` (Prototype README).
+* **Creation**: Documented concept `prototype/duplicate-precision-methods.md` (Duplicate Precision Assessment).
+* **Creation**: Documented concept `prototype/carbonate-methods-note.md` (Carbonate Methods & QC Validation).
+* **Creation**: Documented concept `prototype/carbonate-calc-design.md` (Carbonate Calculation Design).
 * **Update**: Linked `decisions/migration-plan.md` to `prototype/git-submodule.md` (Migration plan uses the git submodule as source).
 * **Creation**: Documented concept `prototype/git-submodule.md` (Prototype Git Submodule).
 * **Update**: Linked `project/overview.md` to `project/overview-detailed.md` (Detailed overview expands on the project overview).
