@@ -11,3 +11,6 @@
 # Local scratch/reference material (may contain unpublished research data)
 local/
 .opencode/
+
+# Agent handoff / meeting notes: working documents, not project deliverables
+context-transfer.md
