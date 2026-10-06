@@ -17,8 +17,16 @@ ALLOWED_DATA_FILES = {"examples/example_data.xlsx"}
 
 DATA_SUFFIXES = {".xlsx", ".xls", ".csv", ".parquet", ".nc", ".dat"}
 
+# Executed notebooks and exported reports embed measurement tables inline, so
+# they count as data when they appear under an output directory.
+OUTPUT_DATA_SUFFIXES = DATA_SUFFIXES | {".ipynb", ".html"}
+
 # Directories the pipeline writes into; none may ever be tracked.
-OUTPUT_DIRS = ["runs", "outputs"]
+OUTPUT_DIRS = ["runs", "outputs", ".pytest_runs"]
+
+# Markers for the unpublished April 2026 cruise. Any of these appearing in a
+# tracked file means real measurements leaked.
+UNPUBLISHED_MARKERS = ["P4506", "2026-04-15", "P4504-S1", "oa_prelim_data.xlsx:"]
 
 
 def _tracked_files() -> list[str]:
@@ -32,11 +40,68 @@ def _tracked_files() -> list[str]:
 def test_no_unexpected_data_files_tracked() -> None:
     tracked = _tracked_files()
     data_files = {f for f in tracked if Path(f).suffix.lower() in DATA_SUFFIXES}
-    # The prototype submodule is a separate repo; its contents are not ours.
+    # The prototype submodule is a separate repo with its own history; its
+    # contents are covered by test_prototype_submodule_has_no_stored_outputs.
     data_files = {f for f in data_files if not f.startswith("references/")}
 
     unexpected = sorted(data_files - ALLOWED_DATA_FILES)
     assert not unexpected, f"Unpublished data files tracked in git: {unexpected}"
+
+
+def test_prototype_submodule_has_no_stored_outputs() -> None:
+    """The pinned submodule commit must not carry executed notebook outputs.
+
+    A submodule gitlink is a durable pointer: `git clone --recursive` fetches
+    whatever commit is pinned here. Stripping outputs from our *copy* of the
+    figure notebooks (P1-07) does nothing about the original, so this asserts
+    the pinned commit itself is clean.
+    """
+    sub = REPO_ROOT / "references" / "prototype" / "oa_pipeline"
+    if not (sub / ".git").exists():
+        pytest.skip("prototype submodule not checked out")
+
+    offenders = []
+    for nb_path in sorted(sub.glob("notebooks/*.ipynb")):
+        try:
+            nb = json.loads(nb_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        for i, cell in enumerate(nb.get("cells", [])):
+            if cell.get("cell_type") == "code" and cell.get("outputs"):
+                offenders.append(f"{nb_path.name}:cell{i}")
+
+    assert not offenders, (
+        "The pinned prototype submodule commit carries executed notebook "
+        f"outputs, which embed real measurements: {offenders[:10]}. "
+        "Strip them upstream and re-pin the submodule."
+    )
+
+
+def test_no_unpublished_cruise_markers_in_tracked_files() -> None:
+    """No tracked file in this repo contains April 2026 cruise identifiers."""
+    # Prose that names the dataset is fine; measurements are not. These files
+    # discuss the cruise by name as documentation.
+    allowed = {
+        "tests/test_no_unpublished_data.py",  # defines the markers
+        "knowledge/prototype/requested-dataset.md",  # documents it as withheld
+    }
+
+    offenders = []
+    for rel in _tracked_files():
+        if rel.startswith("references/") or rel in allowed:
+            continue  # separate repo; covered by the submodule test above
+        path = REPO_ROOT / rel
+        if not path.is_file() or path.stat().st_size > 5_000_000:
+            continue
+        try:
+            text = path.read_text(errors="ignore")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for marker in UNPUBLISHED_MARKERS:
+            if marker in text:
+                offenders.append(f"{rel} contains {marker!r}")
+
+    assert not offenders, f"Unpublished cruise data in tracked files: {offenders[:10]}"
 
 
 def test_example_workbook_is_synthetic() -> None:

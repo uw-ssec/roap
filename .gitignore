@@ -25,3 +25,4 @@ context-transfer.md
 # when run on unpublished data. Never commit these.
 runs/
 outputs/
+.pytest_runs/
