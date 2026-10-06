@@ -13,9 +13,10 @@ from pathlib import Path
 
 import pytest
 
-# The app core lives at the project root, not inside the package.
+# The app core lives in tools/, not inside the package and not at the repo
+# root (it sat at the root in the prototype; P1-09 moved it to tools/).
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 
 core = pytest.importorskip("oa_pipeline_app_core")
 
