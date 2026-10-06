@@ -113,6 +113,9 @@ filterwarnings = [
     "default::FutureWarning",
     "default::DeprecationWarning",
 ]
+markers = [
+    "slow: end-to-end runs that execute the full Papermill notebook chain",
+]
 
 
 # =====================================================================

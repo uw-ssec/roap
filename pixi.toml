@@ -28,9 +28,15 @@ ipython = ">=8.0,<10.0"
 netcdf4 = ">=1.6,<2.0"
 xarray = ">=2024.0,<2026.0"
 pyco2sys = ">=1.8,<2.0"
+ruff = ">=0.5.0,<1.0"
+black = ">=24.0,<25.0"
+mypy = ">=1.10,<2.0"
 
 # The project dependencies from PyPI
 [pypi-dependencies]
+# The pipeline itself, installed editable so Papermill subprocesses and the
+# oa-pipeline console script can import oa_pipeline. pytest's pythonpath=["src"]
+# only covers the test process, not the notebooks it shells out to.
 oa-pipeline = { path = ".", editable = true }
 
 # The main project tasks
