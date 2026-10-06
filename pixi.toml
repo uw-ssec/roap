@@ -3,7 +3,7 @@
 authors = ["University of Washington Scientific Software Engineering Center"] # Project authors
 channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"] # Conda channels for dependencies; okf-agent-memory falls back to the second channel on platforms conda-forge doesn't build yet (osx-arm64, linux-aarch64)
 name = "project-template" # Project name
-platforms = ["osx-arm64", "linux-64", "linux-aarch64"] # Supported platforms for development and deployment
+platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"] # Supported platforms for development and deployment
 version = "0.1.0" # Project version
 
 # The environment configurations for different development scenarios
@@ -13,12 +13,33 @@ onboard = { features = ["pre-commit", "gh-cli", "onboard"], solve-group = "defau
 
 # The project dependencies
 [dependencies]
+python = ">=3.11,<3.12"
+pandas = ">=2.2,<3.0"
+numpy = ">=1.26,<2.5"
+openpyxl = ">=3.1,<4.0"
+matplotlib = ">=3.8,<4.0"
+pyyaml = ">=6.0,<7.0"
+pyarrow = ">=10.0,<20.0"
+tabulate = ">=0.9,<0.11"
+papermill = ">=2.4,<3.0"
+pytest = ">=9.1.1,<10"
+ipykernel = ">=6.0,<8.0"
+ipython = ">=8.0,<10.0"
+netcdf4 = ">=1.6,<2.0"
+xarray = ">=2024.0,<2026.0"
+pyco2sys = ">=1.8,<2.0"
 
 # The project dependencies from PyPI
 [pypi-dependencies]
+oa-pipeline = { path = ".", editable = true }
 
 # The main project tasks
 [tasks]
+pipeline = { cmd = "run_pipeline.sh", description = "Run the full OA pipeline on example data" }
+test = { cmd = "pytest -q", description = "Run the test suite" }
+pre-commit-all = { cmd = "pre-commit run --all-files", description = "Run all pre-commit checks" }
+validate = { cmd = "oa-pipeline validate", description = "Pre-flight validation of input Excel" }
+verify-bundle = { cmd = "oa-pipeline verify-bundle", description = "Verify run bundle integrity" }
 
 # GitHub CLI feature for interacting with GitHub from the command line
 [feature.gh-cli.dependencies]
