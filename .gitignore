@@ -20,3 +20,8 @@ local/
 
 # Agent handoff / meeting notes: working documents, not project deliverables
 context-transfer.md
+
+# Pipeline output: run bundles and stage outputs contain real measurements
+# when run on unpublished data. Never commit these.
+runs/
+outputs/
