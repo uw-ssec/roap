@@ -2,6 +2,12 @@
 .pixi/*
 !.pixi/config.toml
 
+# Python bytecode and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
 # MacOS
 .DS_Store
 
