@@ -8,9 +8,9 @@ this file to see the *shape* of the app; open a panel or module to see what a
 piece *does*.
 
 Launch with:
-    python -m oa_pipeline.alka.app
+    python -m roap.alka.app
 or from the project root:
-    python src/oa_pipeline/alka/app.py
+    python src/roap/alka/app.py
 """
 from __future__ import annotations
 

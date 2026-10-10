@@ -1,5 +1,5 @@
 """
-oa_pipeline.duplicate_precision — duplicate-based precision assessment.
+roap.duplicate_precision — duplicate-based precision assessment.
 
 Implements the GOA-ON Cookbook precision framework for duplicate samples:
 

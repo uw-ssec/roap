@@ -1,5 +1,5 @@
 """
-oa_pipeline.carbonate_calc — internal carbonate-system calculation.
+roap.carbonate_calc — internal carbonate-system calculation.
 
 Computes the carbonate system with PyCO2SYS from the pipeline's own
 RM-corrected total alkalinity and measured pH, at the correct temperature
