@@ -157,12 +157,10 @@ stage → assert untargeted columns byte-identical. **Decider**: Council review 
 **Implemented in**: P0 (Week 3-4), `tests/test_invariants.py`
 
 ---
-
 ## 10. Config Compatibility Gate (P1.2)
 
 **Decision**: `compatible_pipeline_version` in config YAML enforced at runtime —
 stale config fails fast. **Decider**: Epic / PRD ✅ **Implemented in**: P1 (Week
-<<<<<<< HEAD
 5-6), `src/roap/common.py`
 
 ---
