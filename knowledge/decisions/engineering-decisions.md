@@ -4,9 +4,11 @@ title: ROAP v1.0.0 Engineering Decisions
 description:
   "Key engineering decisions for ROAP v1.0.0 implementation: ADR 0001 (NetCDF
   export), PyCO2SYS version, dataset access, GPG signing, PyPI publishing, CI
-  strategy, architecture, data standard, invariant testing, config gate"
-tags: [engineering, decisions, v1.0.0, adr]
+  strategy, architecture, data standard, invariant testing, config gate, package
+  rename, CLI framework"
+tags: [engineering, decisions, v1.0.0, adr, migration, cli]
 generated: { by: agent/cli, at: "2026-10-07T00:00:00Z" }
+updated: { by: agent/cli, at: "2026-10-10T00:00:00Z" }
 status: stable
 ---
 
@@ -21,21 +23,21 @@ status: stable
 
 ### Options Considered
 
-| Option                      | Description                                                                              | Pros                                                                        | Cons                                                        |
-| --------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **Option A: DuckDB**        | Queryable time-series layer with quarterly ingest + query on synthetic multi-cruise data | Full SQL query power; enables complex analytics; future-proof               | Higher implementation effort; adds DB dependency; delays P3 |
-| **Option B: File Manifest** | `manifest.csv` enables `pd.read_csv` + filter workflow for Ama/Nadia                     | Low effort; no new dependencies; meets current filtering needs; unblocks P3 | Limited query flexibility; manual CSV filtering             |
-| **Option C: NetCDF (GOA-ON)** | NetCDF export following GOA-ON template with CF conventions                             | International standard; self-describing; interoperable; GOA-ON compatible   | Requires netCDF4/xarray; schema design effort               |
+| Option                        | Description                                                                              | Pros                                                                        | Cons                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Option A: DuckDB**          | Queryable time-series layer with quarterly ingest + query on synthetic multi-cruise data | Full SQL query power; enables complex analytics; future-proof               | Higher implementation effort; adds DB dependency; delays P3 |
+| **Option B: File Manifest**   | `manifest.csv` enables `pd.read_csv` + filter workflow for Ama/Nadia                     | Low effort; no new dependencies; meets current filtering needs; unblocks P3 | Limited query flexibility; manual CSV filtering             |
+| **Option C: NetCDF (GOA-ON)** | NetCDF export following GOA-ON template with CF conventions                              | International standard; self-describing; interoperable; GOA-ON compatible   | Requires netCDF4/xarray; schema design effort               |
 
 ### Decision
 
 **Selected: Option C — NetCDF (GOA-ON Template)** **Rationale**: GOA-ON
-compatibility is a hard requirement for Nadia (P3.3); NetCDF with CF
-conventions is the international standard for oceanographic data exchange;
-self-describing format eliminates separate metadata manifests; unblocks P3
-export design immediately. **Supersedes**: Previous Option B decision (File
-Manifest). **Decider**: Lead + Prof. Adjei ✅ **Implemented in**: P3 (Week
-10-11), `src/oa_pipeline/export.py` + `oa-pipeline export` CLI
+compatibility is a hard requirement for Nadia (P3.3); NetCDF with CF conventions
+is the international standard for oceanographic data exchange; self-describing
+format eliminates separate metadata manifests; unblocks P3 export design
+immediately. **Supersedes**: Previous Option B decision (File Manifest).
+**Decider**: Lead + Prof. Adjei ✅ **Implemented in**: P3 (Week 10-11),
+`src/roap/export.py` + `roap export` CLI
 
 ---
 
@@ -55,7 +57,7 @@ Manifest). **Decider**: Lead + Prof. Adjei ✅ **Implemented in**: P3 (Week
 `opt_pH_scale=1` (Total scale) **Rationale**: v2 is beta with API changes; v1
 constants validated with Prof. Mahu's group; upgrade path documented for
 post-v1.0.0. **Decider**: Lead (confirm with Prof. Mahu if needed) ⏳
-**Implemented in**: `src/oa_pipeline/carbonate_calc.py` wrapper
+**Implemented in**: `src/roap/carbonate_calc.py` wrapper
 
 ---
 
@@ -132,8 +134,8 @@ Gate**: `pixi run pre-commit-all` (ruff, black, mypy, pytest) **Decider**: Lead
 
 ## 7. Architecture: Single Engine, Three Doors
 
-**Decision**: Core logic in `src/oa_pipeline/`; CLI (`run_pipeline.sh`), GUI
-(`tools/oa_pipeline_app.py`), Notebooks (`notebooks/`) all call same core.
+**Decision**: Core logic in `src/roap/`; CLI (`run_pipeline.sh`), GUI
+(`tools/roap_app.py`), Notebooks (`notebooks/`) all call same core.
 **Decider**: Council review / ADR-0010 ✅ **Implemented in**: P-1 migration
 (Week 1-2)
 
@@ -144,7 +146,7 @@ Gate**: `pixi run pre-commit-all` (ruff, black, mypy, pytest) **Decider**: Lead
 **Decision**: Canonical schema = Frontiers 2021 clarified headers; 0–9 QC flags;
 `-999` missing sentinel. **Deviations**: Document in `docs/schema-deviations.md`
 if any. **Decider**: ADR-0009 ✅ **Implemented in**: P2 (Week 7-9),
-`src/oa_pipeline/schema.py`
+`src/roap/schema.py`
 
 ---
 
@@ -160,7 +162,79 @@ stage → assert untargeted columns byte-identical. **Decider**: Council review 
 
 **Decision**: `compatible_pipeline_version` in config YAML enforced at runtime —
 stale config fails fast. **Decider**: Epic / PRD ✅ **Implemented in**: P1 (Week
-5-6), `src/oa_pipeline/common.py`
+5-6), `src/roap/common.py`
+
+---
+
+## 11. Package Rename: oa-pipeline → roap
+
+### Context
+
+The prototype was named `oa_pipeline` v0.2.0. The production platform is ROAP
+(Reproducible Ocean Acidification Pipeline). The repo is named `roap`.
+
+### Options Considered
+
+| Option                          | Description                     | Pros                                       | Cons                                                |
+| ------------------------------- | ------------------------------- | ------------------------------------------ | --------------------------------------------------- |
+| **Keep oa-pipeline for v0.2.0** | Match prototype version exactly | Continuity with prototype                  | Inconsistent naming; repo=roap, package=oa-pipeline |
+| **Rename to roap now**          | Clean break, consistent naming  | Repo=roap, package=roap, CLI=roap; citable | Requires updating all imports, tests, notebooks     |
+
+### Decision
+
+**Selected: Rename to roap now** **Rationale**: Consistency across repo,
+package, CLI, and project name (ROAP). The rename is a one-time cost (~30 min
+with find/replace) that eliminates confusion permanently. Version 0.2.0 retained
+to match prototype. **Decider**: Lead ✅ **Implemented in**: P-1 migration (Week
+1-2), all imports/tests/notebooks/configs updated.
+
+---
+
+## 12. CLI Framework: Typer
+
+### Context
+
+The prototype had no CLI — only `run_pipeline.sh` (bash) and notebooks. The
+migration plan (P-1.6) required extracting notebook orchestration to CLI entry
+points.
+
+### Options Considered
+
+| Option       | Description                              | Pros                                          | Cons                                     |
+| ------------ | ---------------------------------------- | --------------------------------------------- | ---------------------------------------- |
+| **Click**    | Mature, widely used                      | Large ecosystem; familiar                     | More boilerplate; callback-based         |
+| **Typer**    | Modern, type-hint based (built on Click) | Less boilerplate; auto-completion; modern API | Newer; smaller ecosystem                 |
+| **argparse** | Stdlib only                              | No dependencies                               | Verbose; no auto-completion; manual help |
+
+### Decision
+
+**Selected: Typer** **Rationale**: Modern Python CLI framework; minimal
+boilerplate; auto-completion for users; built on Click so mature foundation;
+already added as dependency in pyproject.toml. **Decider**: Lead ✅
+**Implemented in**: P-1 migration (Week 1-2), `src/roap/cli.py` with `validate`
+and `verify-bundle` commands.
+
+---
+
+## 13. GUI Rename: oa_pipeline_app.py → roap_app.py
+
+### Decision
+
+**Selected: Rename GUI launcher to match package** **Rationale**: Consistency
+with `roap` package name; avoids confusion. Both `roap_app.py` and
+`roap_app_core.py` renamed and updated. **Decider**: Lead ✅ **Implemented in**:
+P-1 migration (Week 1-2).
+
+---
+
+## 14. Notebook Import Updates
+
+### Decision
+
+**Selected: Update all 11 notebooks from `oa_pipeline.*` to `roap.*`**
+**Rationale**: Notebooks are executable documentation and part of the pipeline;
+must use the production package name. Automated via find/replace. **Decider**:
+Lead ✅ **Implemented in**: P-1 migration (Week 1-2).
 
 ---
 
