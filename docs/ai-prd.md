@@ -14,7 +14,7 @@ Build a **production-grade, cross-platform, citable platform** for ocean acidifi
 - Delivers **reproducible runs** via version-pinned releases, config compatibility gates, and immutable run bundles
 - Serves four personas: **Ruu** (trainee, clean-laptop onboarding), **Kofi** (technician, Excel-only, no terminal), **Ama** (analyst, QC configurability, figure provenance), **Fatou** (regional partner, config-driven column mapping), **Nadia** (data manager, quarterly unattended runs, GOA-ON export), **Prof. Adjei** (PI, sign-off summaries, archived run bundles)
 
-**North Star:** Fresh clone → `pixi install` → `pixi run pipeline examples/example_data.xlsx outputs/test` → `analysis_ready.csv` with expected 4 FAIL verdicts on injected rows in <10 min on Linux, macOS, and Windows.
+**North Star:** Fresh clone → `pixi install` → `pixi run pipeline examples/example_data.xlsx outputs/test` → `<out>/oa_stage4_outputs/data/analysis_ready.csv` with the expected 4 non-PASS verdicts (3 FAIL + 1 REVIEW, column `analysis_audit_status`) on injected rows in <10 min on Linux, macOS, and Windows.
 
 ---
 
@@ -170,7 +170,7 @@ roap/
 - [ ] `tests/` has 221+ passing tests (`pytest -q` → `221 passed`)
 - [ ] `examples/example_data.xlsx` exists (or regenerates via `make_example_data.py`)
 - [ ] `configs/` has all YAML configs including `07_stage3.yaml` with `ph_diag_harmonize_temperature: true`
-- [ ] `./run_pipeline.sh examples/example_data.xlsx outputs/test` works end-to-end → 4 FAIL verdicts on injected rows
+- [ ] `./run_pipeline.sh examples/example_data.xlsx outputs/test` works end-to-end → 4 non-PASS verdicts on injected rows (3 FAIL + 1 REVIEW)
 - [ ] Unpublished data NOT in git (`git status` clean of `oa_data_apr*.xlsx`)
 
 ### P0: Cross-Platform CI + Invariant Test + Entry Point

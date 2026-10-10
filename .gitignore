@@ -2,6 +2,12 @@
 .pixi/*
 !.pixi/config.toml
 
+# Python bytecode and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
 # MacOS
 .DS_Store
 
@@ -14,3 +20,9 @@ local/
 
 # Agent handoff / meeting notes: working documents, not project deliverables
 context-transfer.md
+
+# Pipeline output: run bundles and stage outputs contain real measurements
+# when run on unpublished data. Never commit these.
+runs/
+outputs/
+.pytest_runs/
