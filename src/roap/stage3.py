@@ -8,7 +8,7 @@ are advisory and non destructive: rows are flagged for review, not removed.
 
 Import as:
 
-    from oa_pipeline.stage3 import ...
+    from roap.stage3 import ...
 
 Main checks
 -----------

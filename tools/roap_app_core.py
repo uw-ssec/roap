@@ -69,10 +69,10 @@ def find_python() -> str:
 
 
 def package_importable(python_exe: str) -> bool:
-    """Check oa_pipeline is importable by the chosen interpreter."""
+    """Check roap is importable by the chosen interpreter."""
     try:
         r = subprocess.run(
-            [python_exe, "-c", "import oa_pipeline"],
+            [python_exe, "-c", "import roap"],
             capture_output=True,
             text=True,
             timeout=60,
@@ -175,8 +175,8 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
         )
     if not package_importable(python_exe):
         problems.append(
-            f"oa_pipeline is not importable by {python_exe}. "
-            'Run: pip install -e ".[all]"'
+            f"roap is not importable by {python_exe}. "
+            'Run: pip install -e ".[dev]"'
         )
     if not kernel_available(python_exe):
         problems.append(

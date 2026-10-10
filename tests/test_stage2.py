@@ -19,7 +19,7 @@ import copy
 
 import pandas as pd
 
-from oa_pipeline.stage2 import (
+from roap.stage2 import (
     STAGE2_DEFAULTS,
     add_conflict_annotations,
     add_replicate_annotations,

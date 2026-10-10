@@ -21,7 +21,7 @@ import json
 import pandas as pd
 import pytest
 
-from oa_pipeline.common import (
+from roap.common import (
     deep_update,
     has_value_series,
     load_config,

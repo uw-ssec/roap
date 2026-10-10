@@ -9,7 +9,7 @@ sample level analysis gates.
 
 Import as:
 
-    from oa_pipeline.stage1b import ...
+    from roap.stage1b import ...
 
 Stage 1B prepares analysis inputs. It does not run PyCO2SYS and therefore does
 not invent carbonate solver provenance. Existing solver metadata is preserved

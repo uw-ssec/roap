@@ -1,5 +1,5 @@
 # =====================================================================
-# oa-pipeline -- pyproject.toml
+# roap -- pyproject.toml
 # =====================================================================
 # Production-grade package configuration with src-layout
 # =====================================================================
@@ -10,9 +10,9 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "oa-pipeline"
+name = "roap"
 version = "0.2.0"
-description = "Ocean acidification quality control and processing pipeline"
+description = "Reproducible Ocean Acidification Pipeline (ROAP) - ocean acidification quality control and processing platform"
 readme = "README.md"
 license = { file = "LICENSE" }
 
@@ -29,6 +29,7 @@ keywords = [
     "reproducibility",
     "FAIR data",
     "marine science",
+    "ROAP",
 ]
 
 classifiers = [
@@ -56,6 +57,11 @@ dependencies = [
     "ipykernel>=6.0,<8.0",
     "ipython>=8.0,<10.0",
     "hypothesis>=6.0,<7.0",
+    "typer>=0.12,<1.0",
+    # Carbonate chemistry engine. Required by roap.carbonate_calc, which
+    # notebook 08_stage4 imports unconditionally when carbonate calculation is
+    # enabled — a pip install without this cannot do the core science.
+    "pyco2sys>=1.8,<2.0",
 ]
 
 
@@ -73,17 +79,17 @@ dev = [
 
 
 [project.urls]
-Homepage = "https://github.com/your-org/oa_pipeline"
-Documentation = "https://github.com/your-org/oa_pipeline#readme"
-Issues = "https://github.com/your-org/oa_pipeline/issues"
+Homepage = "https://github.com/uw-ssec/roap"
+Documentation = "https://github.com/uw-ssec/roap#readme"
+Issues = "https://github.com/uw-ssec/roap/issues"
 
 
 [project.entry-points."console_scripts"]
-oa-pipeline = "oa_pipeline.__main__:main"
+roap = "roap.cli:app"
 
 
 # =====================================================================
-# Setuptools configuration -- src/oa_pipeline package
+# Setuptools configuration -- src/roap package
 # =====================================================================
 
 [tool.setuptools]
@@ -92,7 +98,7 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["oa_pipeline*"]
+include = ["roap*"]
 
 
 # =====================================================================

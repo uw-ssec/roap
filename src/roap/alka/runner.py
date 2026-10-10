@@ -3,12 +3,12 @@ alka.runner — build and run the pipeline, reusing the existing core module.
 
 This is a thin adapter. It does NOT reimplement command-building, bash
 discovery, or verdict summarising — those already live in
-`oa_pipeline_app_core.py` and are tested and working. Alka imports them and
+`tools/roap_app_core.py` and are tested and working. Alka imports them and
 adds exactly one new step: writing the config files implied by the GUI options
 (via config_writer) before assembling the command.
 
 Keeping this as an adapter means:
-  * the existing launcher (oa_pipeline_app.py) keeps working unchanged;
+  * the existing launcher (tools/roap_app.py) keeps working unchanged;
   * there is one source of truth for how the pipeline is invoked;
   * when a run misbehaves, you look here for the Alka-specific wiring and in
     the core module for the invocation itself — not one tangled file.
@@ -23,14 +23,41 @@ from typing import Callable, Optional
 from .state import AppState
 from . import config_writer
 
-# Import the existing, tested core. We try the package path first (installed
-# as oa_pipeline), then fall back to a top-level module if Alka is run from the
-# project root where oa_pipeline_app_core.py sits beside run_pipeline.sh.
-try:  # pragma: no cover - import resolution differs by launch context
-    from oa_pipeline import oa_pipeline_app_core as core  # type: ignore
-except Exception:  # noqa: BLE001
+# Import the existing, tested core. It lives in `tools/roap_app_core.py`, which
+# is deliberately OUTSIDE the installed package: `tools/roap_app.py` imports it
+# as a bare sibling (see tests/test_gui_launcher.py), so it must stay there.
+#
+# Alka therefore locates it by path rather than by package import. The GUI is
+# inherently repo-bound anyway — it shells out to ./run_pipeline.sh — so
+# resolving relative to the source tree is correct, not a workaround.
+#
+# Import errors are deliberately NOT swallowed: a missing core means the GUI
+# cannot run at all, and a silent failure here previously hid a dead launcher.
+def _load_app_core():  # pragma: no cover - import resolution differs by context
     import importlib
-    core = importlib.import_module("oa_pipeline_app_core")
+    import importlib.util
+    import sys
+
+    # src/roap/alka/runner.py -> parents[3] == repo root
+    tools_dir = Path(__file__).resolve().parents[3] / "tools"
+    core_path = tools_dir / "roap_app_core.py"
+
+    if core_path.is_file():
+        if str(tools_dir) not in sys.path:
+            sys.path.insert(0, str(tools_dir))
+        spec = importlib.util.spec_from_file_location("roap_app_core", core_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load spec for {core_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules.setdefault("roap_app_core", module)
+        spec.loader.exec_module(module)
+        return module
+
+    # Already importable (e.g. launched from tools/, or installed on sys.path).
+    return importlib.import_module("roap_app_core")
+
+
+core = _load_app_core()
 
 
 def resolve_environment(state: AppState) -> list[str]:

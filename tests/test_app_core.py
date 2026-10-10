@@ -18,7 +18,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 
-core = pytest.importorskip("oa_pipeline_app_core")
+core = pytest.importorskip("roap_app_core")
 
 
 def test_find_project_root_finds_markers(tmp_path: Path) -> None:

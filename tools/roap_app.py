@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-oa_pipeline_app.py — desktop launcher for the OA preprocessing pipeline
-=======================================================================
+roap_app.py — desktop launcher for the ROAP preprocessing pipeline
+==================================================================
 
 A point-and-click front end for users who do not want to touch a shell or
 Python. It wraps the same `run_pipeline.sh` the command-line workflow uses, so
@@ -10,16 +10,16 @@ log, and a verdict summary.
 
 How a user runs it
 ------------------
-- Windows:  double-click `oa_pipeline_app.py`  (or `python oa_pipeline_app.py`)
-- macOS:    `python3 oa_pipeline_app.py`
-- Linux:    `python3 oa_pipeline_app.py`
+- Windows:  double-click `roap_app.py`  (or `python roap_app.py`)
+- macOS:    `python3 roap_app.py`
+- Linux:    `python3 roap_app.py`
 
 It must sit in the project root (the folder containing `run_pipeline.sh`,
-`notebooks/`, `src/oa_pipeline/`). It checks that for you on launch.
+`notebooks/`, `src/roap/`). It checks that for you on launch.
 
 No third-party packages are required for the GUI itself: Tkinter ships with
 the standard CPython installer. The pipeline it launches still needs the
-project installed (`pip install -e ".[all]"`) and a Jupyter kernel — the app
+project installed (`pip install -e ".[dev]"`) and a Jupyter kernel — the app
 detects missing pieces and tells the user exactly what to do, rather than
 failing with a traceback.
 """
@@ -55,7 +55,7 @@ APP_TITLE = "OA Pipeline Runner"
 # Logic lives in oa_pipeline_app_core (GUI-independent, unit-tested).
 # ---------------------------------------------------------------------------
 
-from oa_pipeline_app_core import (  # noqa: E402
+from roap_app_core import (  # noqa: E402
     STAGE_FILES,
     build_command,
     environment_problems,

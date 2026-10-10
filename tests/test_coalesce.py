@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from oa_pipeline.common import coalesce_numeric_series, coalesce_string_series
+from roap.common import coalesce_numeric_series, coalesce_string_series
 
 
 # =============================================================================

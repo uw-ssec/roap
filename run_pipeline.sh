@@ -285,13 +285,13 @@ mkdir -p "$RUNS_DIR"
 if [[ "$DRY_RUN" -eq 0 ]]; then
     "$PYTHON_BIN" -c "import papermill" >/dev/null 2>&1 || {
         echo "ERROR: papermill is not installed in this Python environment." >&2
-        echo "Install with: $PYTHON_BIN -m pip install -e \".[all]\"" >&2
+        echo "Install with: $PYTHON_BIN -m pip install -e \".[dev]\"" >&2
         exit 2
     }
 
-    "$PYTHON_BIN" -c "import oa_pipeline" >/dev/null 2>&1 || {
-        echo "ERROR: oa_pipeline is not importable in this Python environment." >&2
-        echo "Install with: $PYTHON_BIN -m pip install -e \".[all]\"" >&2
+    "$PYTHON_BIN" -c "import roap" >/dev/null 2>&1 || {
+        echo "ERROR: roap is not importable in this Python environment." >&2
+        echo "Install with: $PYTHON_BIN -m pip install -e \".[dev]\"" >&2
         exit 2
     }
 fi
@@ -380,7 +380,7 @@ import sys
 
 import pandas as pd
 
-from oa_pipeline.common import safe_sheet_name
+from roap.common import safe_sheet_name
 
 xlsx = Path(sys.argv[1])
 sheet_index = int(sys.argv[2])

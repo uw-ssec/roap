@@ -2,7 +2,7 @@
 # Project metadata and basic configuration
 authors = ["University of Washington Scientific Software Engineering Center"] # Project authors
 channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"] # Conda channels for dependencies; okf-agent-memory falls back to the second channel on platforms conda-forge doesn't build yet (osx-arm64, linux-aarch64)
-name = "project-template" # Project name
+name = "roap" # Project name
 platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"] # Supported platforms for development and deployment
 version = "0.1.0" # Project version
 
@@ -32,21 +32,22 @@ hypothesis = ">=6.0,<7.0"
 ruff = ">=0.5.0,<1.0"
 black = ">=24.0,<25.0"
 mypy = ">=1.10,<2.0"
+typer = ">=0.12,<1.0"
 
 # The project dependencies from PyPI
 [pypi-dependencies]
 # The pipeline itself, installed editable so Papermill subprocesses and the
-# oa-pipeline console script can import oa_pipeline. pytest's pythonpath=["src"]
+# roap console script can import roap. pytest's pythonpath=["src"]
 # only covers the test process, not the notebooks it shells out to.
-oa-pipeline = { path = ".", editable = true }
+roap = { path = ".", editable = true }
 
 # The main project tasks
 [tasks]
-pipeline = { cmd = "run_pipeline.sh", description = "Run the full OA pipeline on example data" }
+pipeline = { cmd = "./run_pipeline.sh", description = "Run the full OA pipeline on example data" }
 test = { cmd = "pytest -q", description = "Run the test suite" }
 pre-commit-all = { cmd = "pre-commit run --all-files", description = "Run all pre-commit checks" }
-validate = { cmd = "oa-pipeline validate", description = "Pre-flight validation of input Excel" }
-verify-bundle = { cmd = "oa-pipeline verify-bundle", description = "Verify run bundle integrity" }
+validate = { cmd = "roap validate", description = "Pre-flight validation of input Excel" }
+verify-bundle = { cmd = "roap verify-bundle", description = "Verify run bundle integrity" }
 
 # GitHub CLI feature for interacting with GitHub from the command line
 [feature.gh-cli.dependencies]

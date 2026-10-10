@@ -5,7 +5,7 @@ Helpers for the QC Output Review notebook.
 
 Import as:
 
-    from oa_pipeline.inspect import ...
+    from roap.inspect import ...
 
 These functions support Notebook 03, which inspects pipeline outputs but does
 not create downstream scientific data products. The helpers are intentionally

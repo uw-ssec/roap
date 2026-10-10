@@ -20,7 +20,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from oa_pipeline.stage3 import (
+from roap.stage3 import (
     STAGE3_DEFAULTS,
     CarbonateIntegrityThresholds,
     add_canonical_helper_columns,

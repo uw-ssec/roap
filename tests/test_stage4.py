@@ -20,7 +20,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from oa_pipeline.stage4 import (
+from roap.stage4 import (
     STAGE4_DEFAULTS,
     DicSpeciesAudit,
     add_readiness_status,

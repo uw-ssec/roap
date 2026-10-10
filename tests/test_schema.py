@@ -18,7 +18,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from oa_pipeline.schema import (
+from roap.schema import (
     DEFAULT_CONFIG,
     add_duplicate_flags,
     apply_canonical_schema,

@@ -14,7 +14,7 @@ and attaches explicit reason codes in analysis_audit_reason_codes.
 
 Import as:
 
-    from oa_pipeline.stage4 import ...
+    from roap.stage4 import ...
 """
 
 from __future__ import annotations

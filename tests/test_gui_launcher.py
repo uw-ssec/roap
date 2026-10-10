@@ -1,7 +1,7 @@
 """Migration gate: GUI launcher is present and importable.
 
-The launcher lives in ``tools/`` per the plan. ``oa_pipeline_app.py`` imports
-``oa_pipeline_app_core`` as a sibling module with no sys.path manipulation, so
+The launcher lives in ``tools/`` per the plan. ``roap_app.py`` imports
+``roap_app_core`` as a sibling module with no sys.path manipulation, so
 both files must stay in the same directory.
 """
 
@@ -13,8 +13,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TOOLS = REPO_ROOT / "tools"
-APP = TOOLS / "oa_pipeline_app.py"
-APP_CORE = TOOLS / "oa_pipeline_app_core.py"
+APP = TOOLS / "roap_app.py"
+APP_CORE = TOOLS / "roap_app_core.py"
 
 
 def test_gui_app_exists() -> None:
@@ -25,7 +25,7 @@ def test_gui_app_exists() -> None:
 def test_app_core_is_importable_without_display() -> None:
     """The core is GUI-independent, so it must import with no Tkinter/display."""
     result = subprocess.run(
-        [sys.executable, "-c", "import oa_pipeline_app_core as c; print(c.find_project_root)"],
+        [sys.executable, "-c", "import roap_app_core as c; print(c.find_project_root)"],
         capture_output=True,
         text=True,
         cwd=TOOLS,
@@ -44,7 +44,7 @@ def test_app_core_finds_repo_root_from_tools() -> None:
         [
             sys.executable,
             "-c",
-            "import oa_pipeline_app_core as c, pathlib;"
+            "import roap_app_core as c, pathlib;"
             "print(c.find_project_root(pathlib.Path('.').resolve()))",
         ],
         capture_output=True,
@@ -75,7 +75,7 @@ def test_gui_app_compiles() -> None:
 def test_gui_app_imports_core_as_sibling() -> None:
     """Both files must live together; a split would break the bare import."""
     source = APP.read_text()
-    assert "from oa_pipeline_app_core import" in source
+    assert "from roap_app_core import" in source
     assert APP.parent == APP_CORE.parent, "app and app_core must share a directory"
 
 

@@ -5,7 +5,7 @@ Shared utilities for the OA ocean acidification preprocessing pipeline.
 
 Import as:
 
-    from oa_pipeline.common import ...
+    from roap.common import ...
 
 This module contains reusable helpers used across the notebook and script
 pipeline. Keeping these helpers in one importable module makes the workflow

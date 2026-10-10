@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from oa_pipeline.stage4 import (
+from roap.stage4 import (
     add_readiness_status,
     detect_duplicates,
     missing_key_rows,

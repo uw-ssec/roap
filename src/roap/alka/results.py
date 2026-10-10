@@ -118,17 +118,24 @@ def read_precision(out_dir: Path,
                    quality_tier: str = "weather") -> PrecisionSummary:
     """Compute duplicate-based precision on the run's analysis_ready.csv.
 
-    Reuses oa_pipeline.duplicate_precision. Returns a PrecisionSummary the panel
-    can render. Degrades gracefully: if the module isn't importable, pandas is
-    missing, or there are no duplicate pairs, `available` is False with a note.
+    Reuses roap.duplicate_precision. Returns a PrecisionSummary the panel
+    can render. Degrades gracefully: if pandas is missing or there are no
+    duplicate pairs, `available` is False with a note.
+
+    Note: `duplicate_precision` is a sibling module in this package, so it is
+    imported relatively and NOT guarded by try/except. A failure to import it
+    is a broken install, not a degraded-capability case — swallowing it here
+    previously made precision silently unavailable forever.
     """
     final = Path(out_dir) / "oa_stage4_outputs" / "data" / "analysis_ready.csv"
     if not final.exists():
         return PrecisionSummary(available=False, message="No final file to assess.")
+
+    from .. import duplicate_precision as dp
+
     try:
         import pandas as pd
-        from oa_pipeline import duplicate_precision as dp
-    except Exception as exc:  # noqa: BLE001
+    except ImportError as exc:
         return PrecisionSummary(available=False,
                                 message=f"Precision unavailable ({type(exc).__name__}).")
     try:

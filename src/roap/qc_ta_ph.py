@@ -8,7 +8,7 @@ Quality control routines for ocean acidification chemistry data:
 
 Import as:
 
-    from oa_pipeline.qc_ta_ph import ...
+    from roap.qc_ta_ph import ...
 
 This module contains reusable QC logic only. Notebook 02 should call these
 functions, write outputs, and present the workflow narrative.

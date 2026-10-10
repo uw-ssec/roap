@@ -5,7 +5,7 @@ Range policy and per record range diagnostics for the OA pipeline.
 
 Import as:
 
-    from oa_pipeline.policy import ...
+    from roap.policy import ...
 
 This module keeps plausible value checks in one place. It creates separate
 missing, non numeric, and out of range flags so that quality control reports can

@@ -21,7 +21,7 @@ import math
 import pandas as pd
 import pytest
 
-from oa_pipeline.qc_ta_ph import (
+from roap.qc_ta_ph import (
     CRM_CERTIFIED_TA,
     PhStdStatusThresholds,
     TaSop,

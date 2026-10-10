@@ -9,7 +9,7 @@ first stage that operates across rows rather than only within rows.
 
 Import as:
 
-    from oa_pipeline.stage2 import ...
+    from roap.stage2 import ...
 """
 
 from __future__ import annotations

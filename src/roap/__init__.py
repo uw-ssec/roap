@@ -1,11 +1,11 @@
 """
-oa_pipeline
-===========
-Ocean acidification pre-processing pipeline.
+roap
+====
+Reproducible Ocean Acidification Pipeline (ROAP).
 
 FIX 10: Added __version__ so outputs can record which pipeline version
 produced them, and added re-exports of the most commonly used public API
-so notebooks can write `from oa_pipeline import die, load_config, RangePolicy`
+so notebooks can write `from roap import die, load_config, RangePolicy`
 instead of importing from each sub-module explicitly.
 
 AUDIT FIX N-1 / N-6: Re-export the two new audit utilities so they are part
@@ -16,7 +16,12 @@ of the documented public surface and easy to wire into notebooks:
     schema/cruise/regional configs agree, instead of relying on sync comments.
 """
 
-__version__ = "0.2.0"
+from importlib.metadata import version as _pkg_version
+
+try:
+    __version__ = _pkg_version("roap")
+except Exception:
+    __version__ = "0.2.0.dev"
 
 # Most-used public API re-exported for notebook convenience.
 from .common import (

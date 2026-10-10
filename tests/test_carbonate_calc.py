@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("PyCO2SYS")
 
-from oa_pipeline import carbonate_calc as cc
+from roap import carbonate_calc as cc
 
 
 def _one_row(ta):

@@ -162,14 +162,14 @@ def pipeline_outputs(
             "`python examples/make_example_data.py` to regenerate it."
         )
 
-    package_dir = project_root / "src" / "oa_pipeline"
+    package_dir = project_root / "src" / "roap"
     if not package_dir.exists():
-        pytest.fail(f"oa_pipeline package directory not found: {package_dir}")
+        pytest.fail(f"roap package directory not found: {package_dir}")
 
-    if importlib.util.find_spec("oa_pipeline") is None:
+    if importlib.util.find_spec("roap") is None:
         pytest.fail(
-            "oa_pipeline is not importable in the pytest process. Run "
-            "`python -m pip install -e \".[all]\"` before running the E2E test."
+            "roap is not importable in the pytest process. Run "
+            "`python -m pip install -e \".[dev]\"` before running the E2E test."
         )
 
     bash_exe = _find_git_bash()

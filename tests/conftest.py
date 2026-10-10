@@ -49,8 +49,8 @@ def src_dir(project_root: Path) -> Path:
 
 @pytest.fixture(scope="session")
 def package_dir(src_dir: Path) -> Path:
-    """Directory containing the oa_pipeline package."""
-    return src_dir / "oa_pipeline"
+    """Directory containing the roap package."""
+    return src_dir / "roap"
 
 
 @pytest.fixture(scope="session")

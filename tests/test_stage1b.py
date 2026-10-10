@@ -20,8 +20,8 @@ import copy
 
 import pandas as pd
 
-from oa_pipeline.policy import RangePolicy
-from oa_pipeline.stage1b import (
+from roap.policy import RangePolicy
+from roap.stage1b import (
     STAGE1B_DEFAULTS,
     add_analysis_range_flags,
     add_best_analysis_fields,

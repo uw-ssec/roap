@@ -6,7 +6,7 @@ and duplicate key selection for the OA pipeline.
 
 Import as:
 
-    from oa_pipeline.schema import ...
+    from roap.schema import ...
 
 This module defines the canonical data model used by Stage 1A onward. Its main
 job is to map variable names from messy Excel or CSV inputs into stable,
