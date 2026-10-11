@@ -43,3 +43,4 @@ parameters:
   # Flag/QC the tris standards but do NOT rewrite sample ph_observed by the
   # standard offset. Set true only if you want measured sample pH corrected.
   PHSTD_CORRECT_SAMPLES: false
+# compatible_pipeline_version: '>=0.2.0'

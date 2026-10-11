@@ -40,6 +40,25 @@ def test_config_compatibility_gate_enforced():
             f"Error should mention version/compatible: {result.stderr}"
 
 
+def test_config_gate_version_parsing():
+    """_version_satisfies and _parse_version handle specifiers correctly."""
+    from roap.common import _version_satisfies, _parse_version
+
+    # Parse version
+    assert _parse_version("0.2.0") == (0, 2, 0)
+    assert _parse_version("1.0.0") == (1, 0, 0)
+    assert _parse_version("0.2.0.dev") == (0, 2, 0)  # truncates at 3 parts
+
+    # Satisfies checks
+    assert _version_satisfies("0.2.0", ">=0.1.0") == True
+    assert _version_satisfies("0.2.0", ">=0.2.0") == True
+    assert _version_satisfies("0.2.0", ">=0.3.0") == False
+    assert _version_satisfies("0.2.0", "==0.2.0") == True
+    assert _version_satisfies("0.2.0", "==0.1.0") == False
+    assert _version_satisfies("0.2.0", "") == True  # no constraint = pass
+    assert _version_satisfies("0.2.0", ">=1.0.0") == False
+
+
 def test_config_compatibility_gate_allows_current_version():
     """Config with current version should pass."""
     config_path = Path("configs/02_ta_ph_qc.yaml")
