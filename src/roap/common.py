@@ -1005,6 +1005,15 @@ def _version_satisfies(current: str, required: str) -> bool:
     if required.startswith(">="):
         min_ver = required[2:]
         return _parse_version(current) >= _parse_version(min_ver)
+
+    if required.startswith("=="):
+        exact_ver = required[2:]
+        return _parse_version(current) == _parse_version(exact_ver)
+    return True
+
+
+def _parse_version(v: str) -> tuple:
+    return tuple(map(int, v.split(".")[:3]))
     if required.startswith("=="):
         exact_ver = required[2:]
         return _parse_version(current) == _parse_version(exact_ver)
