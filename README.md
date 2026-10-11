@@ -1,109 +1,85 @@
-# project-template
+# ROAP — Reproducible Ocean Acidification Pipeline
 
-Blank project repository template for General SSEC projects.
+Production-grade ocean acidification carbonate chemistry QC processing per Frontiers 2021 data standards.
 
-This includes some default
-[community health files](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file#supported-file-types)
-such as as a code of conduct and license file.
+## Quickstart (3 paths)
+
+### 1. CLI — One command
+```bash
+pixi install
+pixi run pipeline examples/example_data.xlsx outputs/test
+```
+Output: `outputs/test/oa_stage4_outputs/data/analysis_ready.csv` with verdicts.
+
+### 2. GUI — No terminal
+```bash
+pixi install
+python tools/roap_app.py
+```
+Click "Run Pipeline", select input, watch progress.
+
+### 3. Notebooks — Step by step
+```bash
+pixi install
+jupyter lab notebooks/
+```
+Run `01_preview.ipynb` → `08_stage4.ipynb` in order.
 
 ## Prerequisites
+- Pixi (package manager): `curl -fsSL https://pixi.sh/install.sh | bash`
+- Python 3.11 (managed by Pixi)
+- Git Bash on Windows (required for `run_pipeline.sh`)
 
-This project uses [Pixi](https://pixi.sh) for dependency management and task
-execution. Install Pixi by following the
-[installation instructions](https://pixi.sh/latest/#installation).
+## Pipeline Stages
+| Stage | Notebook | Module | Purpose |
+|-------|----------|--------|---------|
+| 0 | `01_preview.ipynb` | `inspect.py` | Preview input workbook |
+| 1A | `02_ta_ph_qc.ipynb` | `qc_ta_ph.py` | TA CRM correction, pH standard correction |
+| 1B | `04_stage1a.ipynb` | `stage1b.py` | Best source coalescing |
+| 2 | `05_stage1b.ipynb` | `stage2.py` | Duplicate detection, replicate harmonisation |
+| 3 | `06_stage2.ipynb` | `stage3.py` | Carbonate integrity, DIC sum, pH diagnostic |
+| 4 | `07_stage3.ipynb` | `stage4.py` | Final audit, PASS/REVIEW/FAIL verdicts |
+| Export | `08_stage4.ipynb` | `export.py` | GOA-On NetCDF export (P3) |
 
-## Getting Started
+## Configuration
+All configs in `configs/`:
+- `02_ta_ph_qc.yaml` — TA/pH QC thresholds
+- `07_stage3.yaml` — Carbonate integrity (includes `ph_diag_harmonize_temperature: true`)
+- `08_stage4.yaml` — Audit thresholds
+- `regional.yaml` — Regional partner overrides
+- `schema_aliases.yaml` — Column alias mapping (Fatou's workflow)
+- `crm_certified_values.yaml` — CRM batch certified values
+- `cruise_grade_thresholds.yaml` — Cruise grading
 
-### GitHub Codespaces / Dev Containers
-
-The repository ships a [`.devcontainer/`](.devcontainer/) configuration. Open it
-in GitHub Codespaces (or VS Code Dev Containers) to get a container with Pixi
-and the Claude Code, Codex, Copilot CLI, and OpenCode agent CLIs preinstalled;
-the Pixi environment is installed and auto-activated on first start.
-
-### Installation
-
-Install dependencies:
-
-```bash
-# Install dependencies (Pixi will automatically create the environment)
-pixi install
+## Output Structure
+```
+outputs/<run>/
+├── oa_stage1a_outputs/
+├── oa_stage1b_outputs/
+├── oa_stage2_outputs/
+├── oa_stage3_outputs/
+├── oa_stage4_outputs/
+│   └── data/analysis_ready.csv   # ← Final deliverable
+└── run_bundle_manifest.json       # P1: immutable run record
 ```
 
-### Onboarding
+## Expected Output (synthetic data)
+Running on `examples/example_data.xlsx` produces **4 non-PASS** verdicts in `analysis_audit_status`:
+- 16 PASS
+- 3 FAIL (injected bad rows)
+- 1 REVIEW (borderline)
 
-For first-time setup, use the onboarding environment to configure your
-development environment:
+## Troubleshooting
+| Problem | Solution |
+|---------|----------|
+| `ModuleNotFoundError: roap` | Run `pixi install` |
+| `run_pipeline.sh: command not found` | Use Git Bash on Windows; `chmod +x run_pipeline.sh` on Unix |
+| GUI won't open | Ensure Tkinter installed (bundled with python.org installer) |
+| Carbonate calc fails | PyCO2SYS v1 required; `pixi install` pulls it |
+| Config version mismatch | Update `compatible_pipeline_version` in config YAML |
 
-```bash
-pixi run -e onboard onboard
-```
-
-This will:
-
-- Install pre-commit hooks in your git repository
-- Set up shell completion for ssec-cli
-- Run the SSEC onboarding process
-
-## Project Structure
-
-This project is organized using Pixi features for modular dependency management:
-
-- **`pre-commit`**: Code quality and consistency checks
-- **`gh-cli`**: GitHub CLI for repository interactions
-- **`onboard`**: Tools for project onboarding and setup
-
-## Available Environments
-
-- **`default`**: Standard development environment with pre-commit hooks and
-  GitHub CLI
-- **`onboard`**: Extended environment including onboarding tools
-
-## Development
-
-### Using Different Environments
-
-Switch between environments as needed:
-
-```bash
-# Use default environment
-pixi shell
-
-# Use onboard environment
-pixi shell -e onboard
-```
-
-### Adding Dependencies
-
-Edit `pixi.toml` to add new dependencies:
-
-```toml
-[dependencies]
-your-package = ">=1.0.0"
-```
-
-Then run:
-
-```bash
-pixi install
-```
-
-or
-
-Directly add packages (this will edit the pixi toml and install):
-
-```bash
-pixi add your-package
-```
-
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of
-conduct and the process for submitting pull requests. If you use AI tools while
-contributing, read the [AI Policy](AI_POLICY.md) first: it covers disclosure,
-review responsibility, and how to credit AI assistance in commits.
-
-## License
-
-This project is licensed under the terms specified in the [LICENSE](LICENSE)
-file.
+## For Developers
+- `pixi run test` — Full test suite (373 tests)
+- `pixi run pre-commit-all` — Quality gate (ruff, black, mypy, pytest)
+- `pytest tests/test_invariants.py -v` — Invariant test only
+- See `CONTRIBUTING.md` for contribution discipline
