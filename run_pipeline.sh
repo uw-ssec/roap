@@ -599,6 +599,34 @@ if [[ "$DRY_RUN" -eq 0 ]] && should_run 8; then
 fi
 
 # ---------------------------------------------------------------------
+# Generate run bundle manifest
+# ---------------------------------------------------------------------"
+
+GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+
+"$PYTHON_BIN" -c "
+from roap.bundle import generate_run_bundle_manifest
+from roap import __version__
+from pathlib import Path
+import os
+
+run_dir = Path(os.environ.get('RUNS_DIR', ''))
+input_xlsx = Path(os.environ.get('INPUT_XLSX', ''))
+config_dir_str = os.environ.get('CONFIG_DIR', '')
+config_dir = Path(config_dir_str) if config_dir_str else None
+git_commit = os.environ.get('GIT_COMMIT', 'unknown')
+pipeline_version = __version__
+
+generate_run_bundle_manifest(
+    run_dir=run_dir,
+    input_xlsx=input_xlsx,
+    config_dir=config_dir,
+    git_commit=git_commit,
+    pipeline_version=pipeline_version
+)
+" 2>/dev/null || echo "Warning: could not generate run bundle manifest"
+
+# ---------------------------------------------------------------------
 # Footer
 # ---------------------------------------------------------------------
 

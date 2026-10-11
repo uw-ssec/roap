@@ -9,6 +9,7 @@ from typing import Optional
 import typer
 
 from . import __version__
+from .bundle import generate_run_bundle_manifest, verify_bundle as _verify_bundle
 
 app = typer.Typer(
     name="roap",
@@ -84,29 +85,14 @@ def verify_bundle(
     - Code version (git sha) matches
     - Output file hashes match
     """
-    manifest_path = run_dir / "run_bundle_manifest.json"
-    if not manifest_path.exists():
-        typer.echo(f"Error: Manifest not found: {manifest_path}", err=True)
+    if _verify_bundle(run_dir):
+        typer.echo(f"Bundle verified: {run_dir}")
+        if json_output:
+            # Build a minimal JSON report from the manifest
+            manifest_path = run_dir / "run_bundle_manifest.json"
+            if manifest_path.exists():
+                manifest = json.loads(manifest_path.read_text())
+                typer.echo(json.dumps({"status": "valid", "run_dir": str(run_dir), "manifest": manifest}))
+    else:
+        typer.echo(f"Bundle verification ERROR: {run_dir}", err=True)
         raise typer.Exit(code=1)
-
-    try:
-        manifest = json.loads(manifest_path.read_text())
-    except json.JSONDecodeError as e:
-        typer.echo(f"Error parsing manifest: {e}", err=True)
-        raise typer.Exit(code=1)
-
-    # Stage notebooks write the package version under
-    # manifest["package_versions"]["roap"]; accept a flat "roap_version" too so
-    # a future run-bundle manifest can use either shape.
-    _pkg_versions = manifest.get("package_versions") or {}
-    _version = _pkg_versions.get("roap") or manifest.get("roap_version") or "unknown"
-
-    typer.echo(f"Verifying bundle: {run_dir}")
-    typer.echo(f"  Pipeline version: {_version}")
-    typer.echo(f"  Git commit: {manifest.get('git_commit', 'unknown')}")
-    typer.echo(f"  Timestamp: {manifest.get('timestamp', 'unknown')}")
-
-    # TODO: Implement actual verification logic
-    typer.echo("  [STUB] Verification logic not yet implemented")
-    if json_output:
-        typer.echo(json.dumps({"status": "stub", "run_dir": str(run_dir), "manifest": manifest}))
