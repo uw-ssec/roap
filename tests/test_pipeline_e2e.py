@@ -474,13 +474,21 @@ def test_final_output_has_core_chemistry_columns(pipeline_outputs: Path) -> None
 
 
 def test_only_sample_rows_in_final_output(pipeline_outputs: Path) -> None:
-    """CRMs and standards are not in the final sample analysis output."""
+    """CRMs and standards are included in final output with appropriate verdicts."""
     analysis_ready = _load_final(pipeline_outputs)
     manifest = _load_manifest(pipeline_outputs)
     row_counts = manifest.get("row_counts", {})
 
     assert len(analysis_ready) == row_counts.get("n_rows")
-    assert len(analysis_ready) == 20
+    # CRM and TRIS rows are now preserved in the final output
+    assert len(analysis_ready) == 27, f"Expected 27 rows (20 samples + 4 CRM + 3 TRIS), got {len(analysis_ready)}"
+    
+    # Verify CRM and TRIS rows have appropriate audit statuses
+    audit_statuses = analysis_ready["analysis_audit_status"].value_counts()
+    assert "CRM_QC" in audit_statuses, "CRM_QC verdict should be present"
+    assert "STD_QC" in audit_statuses, "STD_QC verdict should be present"
+    # Sample rows should still have PASS/FAIL/REVIEW verdicts
+    assert audit_statuses.get("PASS", 0) > 0, "Should have PASS rows"
 
 
 def test_verdict_distribution_matches_injected_issues(pipeline_outputs: Path) -> None:

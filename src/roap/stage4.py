@@ -1257,15 +1257,22 @@ def add_readiness_status(
 
     # FIX 8-A: Use explicit where() pattern so priority ordering is unambiguous.
     # The previous sequential assignment (PASS → REVIEW → FAIL) was logically
-    # correct today but fragile: any future flag added to `review` after the
-    # `severe` assignment would silently downgrade a FAIL row to REVIEW.
-    # where(~condition, new_value) means "keep existing value where condition
-    # is False, replace with new_value where condition is True", so FAIL always
-    # wins over REVIEW, and REVIEW only applies where FAIL is not set.
     status = pd.Series("PASS", index=out.index, dtype="string")
     status = status.where(~review, "REVIEW")
     status = status.where(~severe, "FAIL")
     out["analysis_audit_status"] = status
+
+    # Set audit status based on row classification (from Stage 1B)
+    # CRM rows get CRM_QC, TRIS rows get STD_QC, sample rows get PASS/REVIEW/FAIL
+    if "row_classification" in out.columns:
+        audit_status = out["analysis_audit_status"].copy()
+        crm_mask = out["row_classification"].eq("CRM_QC") | out["row_classification"].eq("CRM")
+        std_mask = out["row_classification"].eq("STD_QC") | out["row_classification"].eq("STD")
+        # CRM rows should have CRM_QC verdict
+        audit_status[crm_mask] = "CRM_QC"
+        # TRIS rows should have STD_QC verdict
+        audit_status[std_mask] = "STD_QC"
+        out["analysis_audit_status"] = audit_status
 
     return out
 

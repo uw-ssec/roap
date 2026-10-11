@@ -541,28 +541,49 @@ def classify_rows_sample(df: pd.DataFrame) -> pd.Series:
     Explicit sample_type labels are used when available. Blank sample_type values
     fall back to the QC flags: a row is treated as a sample if it is neither a
     TA CRM nor a pH standard.
+
+    Returns a series with values "SAMPLE", "CRM", or "STD".
     """
     is_crm = _bool_series(df, "is_ta_crm_row", default=False)
-    is_std = _bool_series(df, "is_phstd_row", default=False)
-    fallback_sample = ~(is_crm | is_std)
 
     if "sample_type" not in df.columns:
-        return fallback_sample.astype("boolean")
+        # No sample_type column: CRM rows are "CRM", others are "SAMPLE"
+        return pd.Series(
+            ["CRM" if c else "SAMPLE" for c in is_crm],
+            index=df.index,
+            dtype=object,
+        )
 
     sample_type = safe_str_series(df["sample_type"]).str.lower()
 
     explicit_sample = sample_type.isin(
         ["sample", "s", "environmental", "water_sample", "water sample"]
     )
-    explicit_non_sample = sample_type.isin(
-        ["crm", "rm", "standard", "std", "phstd", "ph_standard", "ph standard", "blank"]
+    explicit_crm = sample_type.isin(
+        ["crm", "rm", "phstd", "ph_standard", "ph standard", "blank"]
+    )
+    explicit_std = sample_type.isin(
+        ["tris", "tris_certified", "tris_std", "tris_std_ar", "std"]
     )
 
-    out = pd.Series(fallback_sample, index=df.index, dtype=bool)
-    out.loc[explicit_sample] = True
-    out.loc[explicit_non_sample] = False
+    # Build result: SAMPLE for explicit samples, CRM for explicit CRM,
+    # STD for explicit STD/TRIS, fallback to QC flags for untagged rows
+    out = pd.Series("SAMPLE", index=df.index, dtype=object)
+    out[explicit_crm & ~explicit_std] = "CRM"
+    out[explicit_std] = "STD"
 
-    return out.astype("boolean")
+    # Fallback: rows not explicitly tagged use QC flags
+    fallback_mask = ~explicit_sample & ~explicit_crm & ~explicit_std
+    if fallback_mask.any():
+        fallback_qc = pd.Series(
+            ["CRM" if is_crm.iloc[i] else ("STD" if is_std.iloc[i] else "SAMPLE")
+             for i in df.index if fallback_mask.iloc[i]],
+            index=df.index[fallback_mask],
+            dtype=object,
+        )
+        out = out.mask(fallback_mask, fallback_qc)
+
+    return out
 
 
 # =============================================================================
@@ -865,8 +886,13 @@ def add_analysis_range_flags(df: pd.DataFrame, policy: RangePolicy) -> None:
 
 
 def analysis_ready_subset(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
-    """Return sample only rows with QC and strict analysis gates."""
-    out = df.loc[df["is_sample_row"].fillna(False).astype(bool)].copy()
+    """Return all rows with QC and strict analysis gates, preserving CRM/TRIS."""
+    # Keep ALL rows (not just samples) to preserve CRM/TRIS rows with appropriate verdicts
+    out = df.copy()
+
+    # Classify rows: SAMPLE, CRM, or STD (based on sample_type or QC flags)
+    from .stage1b import classify_rows_sample as _classify_rows_sample
+    out["row_classification"] = _classify_rows_sample(df)
 
     policy = config.get("analysis_policy", {})
     allowed_qc_status = set(
