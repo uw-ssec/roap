@@ -591,6 +591,7 @@ def load_config(
     if not isinstance(loaded, Mapping):
         die(f"Config file must contain a dictionary at the top level: {path}")
 
+    check_config_compatibility(loaded, str(path))
     return deep_update(base, loaded)
 
 
@@ -978,10 +979,29 @@ def build_corrections_table(
 
         return grp
 
-    return pd.DataFrame(
-        {
-            "overall_n": [overall_n],
-            "overall_correction": [overall_mean],
-            "overall_sd": [overall_sd],
-        }
-    )
+
+def check_config_compatibility(config: dict, config_name: str) -> None:
+    """Enforce compatible_pipeline_version gate. Exits if version mismatch."""
+    from importlib.metadata import version as pkg_version
+    required = config.get("compatible_pipeline_version")
+    if required:
+        current = pkg_version("roap")
+        if not _version_satisfies(current, required):
+            raise SystemExit(
+                f"Config '{config_name}' requires pipeline version {required}, "
+                f"but current version is {current}. Update config or downgrade pipeline."
+            )
+
+
+def _version_satisfies(current: str, required: str) -> bool:
+    if required.startswith(">="):
+        min_ver = required[2:]
+        return _parse_version(current) >= _parse_version(min_ver)
+    if required.startswith("=="):
+        exact_ver = required[2:]
+        return _parse_version(current) == _parse_version(exact_ver)
+    return True
+
+
+def _parse_version(v: str) -> tuple:
+    return tuple(map(int, v.split(".")[:3]))
