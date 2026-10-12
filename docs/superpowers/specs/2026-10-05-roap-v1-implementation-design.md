@@ -1,22 +1,29 @@
 # ROAP v1.0.0 — Implementation Design
 
-**Status**: Approved
-**Date**: 2026-10-05
-**Based on**: AI-Friendly PRD (`docs/ai-prd.md`), decisions (`decisions.md`), council review, prototype v0.2.0
+**Status**: Approved **Date**: 2026-10-05 **Based on**: AI-Friendly PRD
+(`docs/ai-prd.md`), decisions (`decisions.md`), council review, prototype v0.2.0
 
 ---
 
 ## Overview
 
-Transform the `oa_pipeline` v0.2.0 research prototype (8 Papermill notebooks, 221 tests, Windows-only) into a production-grade, cross-platform, citable Python package with CLI, GUI, and notebook interfaces — delivering reproducible ocean acidification carbonate chemistry QC processing per Frontiers 2021 data standards.
+Transform the `oa_pipeline` v0.2.0 research prototype (8 Papermill notebooks,
+221 tests, Windows-only) into a production-grade, cross-platform, citable Python
+package with CLI, GUI, and notebook interfaces — delivering reproducible ocean
+acidification carbonate chemistry QC processing per Frontiers 2021 data
+standards.
 
-**North Star**: Fresh clone → `pixi install` → `pixi run pipeline examples/example_data.xlsx outputs/test` → `analysis_ready.csv` with expected 4 FAIL verdicts in <10 min on Linux, macOS, Windows.
+**North Star**: Fresh clone → `pixi install` →
+`pixi run pipeline examples/example_data.xlsx outputs/test` →
+`analysis_ready.csv` with expected 4 FAIL verdicts in <10 min on Linux, macOS,
+Windows.
 
 ---
 
 ## Architecture
 
 ### Single Engine, Three Doors (ADR-0010)
+
 ```
 src/oa_pipeline/          # Core engine (12 pure Python modules)
     ├── __init__.py       # Public API re-exports
@@ -57,24 +64,36 @@ Notebook: notebooks/*.ipynb → src/oa_pipeline modules
 ## Phase Breakdown
 
 ### P-1: Prototype Migration (Weeks 1-2) — BLOCKING
-**Goal**: Copy prototype → target repo structure, all 221 tests pass, pipeline runs on synthetic data.
+
+**Goal**: Copy prototype → target repo structure, all 221 tests pass, pipeline
+runs on synthetic data.
 
 ### P0: Cross-Platform CI + Invariant Test + Entry Point (Weeks 3-4)
-**Goal**: CI green on Ubuntu/macOS/Windows + invariant test fails on column mutation + single README.
+
+**Goal**: CI green on Ubuntu/macOS/Windows + invariant test fails on column
+mutation + single README.
 
 ### P1: Tagged Release v0.2.0 + Run Bundles + Config Gate (Weeks 5-6)
-**Goal**: `pip install oa-pipeline==0.2.0` works; config gate enforced; run bundles produced.
+
+**Goal**: `pip install oa-pipeline==0.2.0` works; config gate enforced; run
+bundles produced.
 
 ### P2: Schema/Provenance/CRM/Excel Fixes + Property Tests (Weeks 7-9)
-**Goal**: Frontiers 2021 audit complete; Excel round-trip fixed; CRM/std validation fails fast; hypothesis tests in CI.
+
+**Goal**: Frontiers 2021 audit complete; Excel round-trip fixed; CRM/std
+validation fails fast; hypothesis tests in CI.
 
 ### P4: ADR 0001 — Queryable Layer Scope (Week 9, 2-3 days)
+
 **Goal**: ADR written, reviewed, decided before P3.
 
 ### P3: GOA-ON Export + Pre-Flight Validation + Manual Regression (Weeks 10-11)
-**Goal**: Pre-flight CLI/GUI works; GOA-ON export valid; April 2026 dataset → 22/16/0.
+
+**Goal**: Pre-flight CLI/GUI works; GOA-ON export valid; April 2026 dataset →
+22/16/0.
 
 ### v1.0.0: Tagged Release v1.0.0 (Week 12)
+
 **Goal**: All Definition of Done criteria met.
 
 ---
@@ -86,7 +105,8 @@ Notebook: notebooks/*.ipynb → src/oa_pipeline modules
 3. **Dataset**: Local path available for manual regression
 4. **GPG Signing**: Deferred to post-v1.0.0 (unsigned tags)
 5. **PyPI Publishing**: Manual for v1.0.0 (org not ready)
-6. **CI**: GitHub Actions matrix (Ubuntu/macOS/Windows Git Bash), Python 3.11, Pixi only
+6. **CI**: GitHub Actions matrix (Ubuntu/macOS/Windows Git Bash), Python 3.11,
+   Pixi only
 7. **Architecture**: Single engine, three doors (ADR-0010)
 8. **Data Standard**: Frontiers 2021 (ADR-0009)
 9. **Invariant Test**: In CI on every PR (ADR-0003)
@@ -96,30 +116,30 @@ Notebook: notebooks/*.ipynb → src/oa_pipeline modules
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| Prototype migration reveals hidden dependencies | P-1 verification runs full test suite + pipeline before P0 |
-| Invariant test catches latent bugs requiring schema changes | P0 invariant test fails fast; schema changes in P2 |
-| Cross-platform CI flakiness on Windows | Git Bash documented; cache pixi env; `OA_KEEP_PYTEST_RUNS=1` debug |
-| Unpublished dataset regression fails | Document exact manual process; release gate, not CI gate |
-| Config-driven aliases break existing configs | Config compatibility gate (P1) enforces version pinning |
+| Risk                                                        | Mitigation                                                         |
+| ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| Prototype migration reveals hidden dependencies             | P-1 verification runs full test suite + pipeline before P0         |
+| Invariant test catches latent bugs requiring schema changes | P0 invariant test fails fast; schema changes in P2                 |
+| Cross-platform CI flakiness on Windows                      | Git Bash documented; cache pixi env; `OA_KEEP_PYTEST_RUNS=1` debug |
+| Unpublished dataset regression fails                        | Document exact manual process; release gate, not CI gate           |
+| Config-driven aliases break existing configs                | Config compatibility gate (P1) enforces version pinning            |
 
 ---
 
 ## Success Metrics (v1.0.0)
 
-| Metric | Target |
-|--------|--------|
-| Onboarding time (Ruu) | < 1 hour |
-| Cross-platform CI pass rate | 100% on every PR |
-| Invariant test coverage | Catches all column mutation classes |
-| Schema compliance | 0 undocumented Frontiers 2021 deviations |
-| Config-driven adoption | Fatou maps archive via `schema_aliases.yaml` only |
-| Release citability | `pip install oa-pipeline==1.0.0` + tagged release + PyPI |
-| Reproducibility | `oa-pipeline verify-bundle` validates any archived run |
-| Kofi workflow | Excel validation via GUI in <5s, no terminal |
-| GOA-ON export | Portal sandbox ingestion passes |
-| Manual regression | April 2026 dataset → 22/16/0 before every release |
+| Metric                      | Target                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| Onboarding time (Ruu)       | < 1 hour                                                 |
+| Cross-platform CI pass rate | 100% on every PR                                         |
+| Invariant test coverage     | Catches all column mutation classes                      |
+| Schema compliance           | 0 undocumented Frontiers 2021 deviations                 |
+| Config-driven adoption      | Fatou maps archive via `schema_aliases.yaml` only        |
+| Release citability          | `pip install oa-pipeline==1.0.0` + tagged release + PyPI |
+| Reproducibility             | `oa-pipeline verify-bundle` validates any archived run   |
+| Kofi workflow               | Excel validation via GUI in <5s, no terminal             |
+| GOA-ON export               | Portal sandbox ingestion passes                          |
+| Manual regression           | April 2026 dataset → 22/16/0 before every release        |
 
 ---
 
