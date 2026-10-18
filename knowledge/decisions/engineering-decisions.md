@@ -162,6 +162,7 @@ stage → assert untargeted columns byte-identical. **Decider**: Council review 
 
 **Decision**: `compatible_pipeline_version` in config YAML enforced at runtime —
 stale config fails fast. **Decider**: Epic / PRD ✅ **Implemented in**: P1 (Week
+<<<<<<< HEAD
 5-6), `src/roap/common.py`
 
 ---
@@ -237,7 +238,6 @@ must use the production package name. Automated via find/replace. **Decider**:
 Lead ✅ **Implemented in**: P-1 migration (Week 1-2).
 
 ---
-
 ## Related Documents
 
 - [Council Review of Epic Plan](council-review.md)
