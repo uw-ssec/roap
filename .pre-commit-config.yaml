@@ -32,6 +32,12 @@ repos:
     rev: "v2.3.0"
     hooks:
       - id: codespell
+        # Domain/API tokens that are not typos:
+        #   nd        - the `nd=` keyword arg of common.fmt() (number of digits)
+        #   lattitude - a deliberately misspelled column name in
+        #               tests/test_schema.py, used as the alias-resolution
+        #               fixture; "correcting" it would break the test.
+        args: ["--ignore-words-list=nd,lattitude"]
 
   - repo: local
     hooks:
