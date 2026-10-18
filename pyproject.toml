@@ -1,0 +1,176 @@
+# =====================================================================
+# roap -- pyproject.toml
+# =====================================================================
+# Production-grade package configuration with src-layout
+# =====================================================================
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "roap"
+version = "0.2.0"
+description = "Reproducible Ocean Acidification Pipeline (ROAP) - ocean acidification quality control and processing platform"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+authors = [
+    { name = "Prof. R. Mahu" },
+    { name = "Maurice Oti Edusei" },
+]
+
+keywords = [
+    "ocean acidification",
+    "carbonate chemistry",
+    "data preprocessing",
+    "quality control",
+    "reproducibility",
+    "FAIR data",
+    "marine science",
+    "ROAP",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Oceanography",
+]
+
+requires-python = ">=3.11,<3.12"
+
+dependencies = [
+    "pandas>=2.2,<3.0",
+    "numpy>=1.26,<2.5",
+    "openpyxl>=3.1,<4.0",
+    "matplotlib>=3.8,<4.0",
+    "pyyaml>=6.0,<7.0",
+    "pyarrow>=10.0,<20.0",
+    "tabulate>=0.9,<0.11",
+    "papermill>=2.4,<3.0",
+    "ipykernel>=6.0,<8.0",
+    "ipython>=8.0,<10.0",
+    "hypothesis>=6.0,<7.0",
+    "typer>=0.12,<1.0",
+    # Carbonate chemistry engine. Required by roap.carbonate_calc, which
+    # notebook 08_stage4 imports unconditionally when carbonate calculation is
+    # enabled — a pip install without this cannot do the core science.
+    "pyco2sys>=1.8,<2.0",
+]
+
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0,<10.0",
+]
+
+dev = [
+    "pytest>=8.0,<10.0",
+    "ruff>=0.5.0,<1.0",
+    "black>=24.0,<25.0",
+    "mypy>=1.10,<2.0",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/uw-ssec/roap"
+Documentation = "https://github.com/uw-ssec/roap#readme"
+Issues = "https://github.com/uw-ssec/roap/issues"
+
+
+[project.entry-points."console_scripts"]
+roap = "roap.cli:app"
+
+
+# =====================================================================
+# Setuptools configuration -- src/roap package
+# =====================================================================
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["roap*"]
+
+
+# =====================================================================
+# Pytest configuration
+# =====================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["src"]
+xfail_strict = true
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+filterwarnings = [
+    "default::FutureWarning",
+    "default::DeprecationWarning",
+]
+markers = [
+    "slow: end-to-end runs that execute the full Papermill notebook chain",
+]
+
+
+# =====================================================================
+# Ruff configuration
+# =====================================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+preview = true
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+
+# =====================================================================
+# Black configuration
+# =====================================================================
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+extend-exclude = ''
+
+
+# =====================================================================
+# MyPy configuration
+# =====================================================================
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true

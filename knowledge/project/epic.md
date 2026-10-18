@@ -55,7 +55,7 @@ The `roap` repo is a template. The pipeline code, tests, notebooks, configs, and
   - Add `src/oa_pipeline/cli.py` with `typer`/`click` for `oa-pipeline validate`, `oa-pipeline export`, `oa-pipeline verify-bundle`
   - Notebooks 02-08 become callable module functions (already mostly are in `src/oa_pipeline/stage*.py`)
 - [ ] **P-1.7** Add `.gitignore` entry for Unpublished data
-- [ ] **P-1.8** Verify migration: `pixi install` → `pytest -q` → 221 pass → `./run_pipeline.sh examples/example_data.xlsx outputs/test` → expected 4 FAIL verdicts on injected rows
+- [ ] **P-1.8** Verify migration: `pixi install` → `pytest -q` → 221 pass → `./run_pipeline.sh examples/example_data.xlsx outputs/test` → expected 4 non-PASS verdicts on injected rows (3 FAIL + 1 REVIEW)
 
 ### Success Criteria
 - [ ] `src/oa_pipeline/` exists with all 12 modules (`__init__.py`, `common.py`, `schema.py`, `qc_ta_ph.py`, `stage1b.py`, `stage2.py`, `stage3.py`, `stage4.py`, `policy.py`, `inspect.py`, `carbonate_calc.py`, `duplicate_precision.py`)
@@ -107,7 +107,7 @@ The `roap` repo is a template. The pipeline code, tests, notebooks, configs, and
 ### Success Criteria
 - [ ] CI passes on **all three platforms** (Ubuntu, macOS, Windows) on every push/PR
 - [ ] **Invariant test fails** if any stage mutates a column it doesn't target (lat/lon, or any other)
-- [ ] Fresh clone → `pixi install` → `pixi run pipeline examples/example_data.xlsx outputs/test` → produces `analysis_ready.csv` with expected verdict counts (4 FAIL injected rows) in <10 min
+- [ ] Fresh clone → `pixi install` → `pixi run pipeline examples/example_data.xlsx outputs/test` → produces `<out>/oa_stage4_outputs/data/analysis_ready.csv` with expected verdict counts (4 non-PASS injected rows: 3 FAIL + 1 REVIEW) in <10 min
 - [ ] Single `README.md` is the **only** file a newcomer needs to read to run the pipeline
 - [ ] `pixi run test` executes full test suite (221+ tests + invariant test) and passes
 - [ ] GUI launcher (`python tools/oa_pipeline_app.py`) opens and runs on all three platforms

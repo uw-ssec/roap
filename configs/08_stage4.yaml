@@ -1,0 +1,11 @@
+# configs/08_stage4.yaml
+# Written by Alka (do not hand-edit unless you know why).
+# Enables the internal PyCO2SYS carbonate calculation in Stage 4:
+# DIC / Omega / pCO2 computed from RM-corrected TA + measured pH, at the
+# lab-temperature input / in-situ-temperature output convention.
+# Settings are pinned/validated (Lueker 2000; Dickson KSO4; Lee 2010
+# borate; Perez & Fraga KF; total pH scale). See carbonate_calc_design.md.
+carbonate_calc:
+  enabled: true
+  require_corrected_ta: true
+  rm_reject_fraction_warn: 0.34
