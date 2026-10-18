@@ -495,11 +495,18 @@ fi
 if should_run 2; then
     CONFIG="$(resolve_config 02_ta_ph_qc)"
 
-    run_papermill "$NOTEBOOK_DIR/02_ta_ph_qc.ipynb" "$RUNS_DIR/02_ta_ph_qc.run.ipynb" \
-        -p XLSX_PATH "$INPUT_XLSX" \
-        -p OUT_DIR "$QC_OUT" \
-        -p SHEET "$SHEET" \
+    PAPERMILL_ARGS=(
+        "$NOTEBOOK_DIR/02_ta_ph_qc.ipynb" "$RUNS_DIR/02_ta_ph_qc.run.ipynb"
+        -p XLSX_PATH "$INPUT_XLSX"
+        -p OUT_DIR "$QC_OUT"
+        -p SHEET "$SHEET"
         -p CONFIG_PATH "$CONFIG"
+    )
+    if [[ -n "$CONFIG_DIR" ]]; then
+        PAPERMILL_ARGS+=(-p CRM_VALUES_CONFIG "$CONFIG_DIR/crm_certified_values.yaml")
+    fi
+
+    run_papermill "${PAPERMILL_ARGS[@]}"
 fi
 
 # ---------------------------------------------------------------------
@@ -597,6 +604,41 @@ fi
 if [[ "$DRY_RUN" -eq 0 ]] && should_run 8; then
     require_file "$S4_OUT/data/analysis_ready.csv" "final Stage 4 deliverable"
 fi
+
+# ---------------------------------------------------------------------
+# Generate run bundle manifest
+# ---------------------------------------------------------------------"
+
+export OUTPUT_ROOT
+export INPUT_XLSX
+export CONFIG_DIR
+export RUNS_DIR
+GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+
+"$PYTHON_BIN" -c "
+from roap.bundle import generate_run_bundle_manifest
+from roap import __version__
+from pathlib import Path
+import os
+
+run_dir = Path(os.environ.get('RUNS_DIR', ''))
+input_xlsx = Path(os.environ.get('INPUT_XLSX', ''))
+config_dir_str = os.environ.get('CONFIG_DIR', '')
+config_dir = Path(config_dir_str) if config_dir_str else None
+output_root_str = os.environ.get('OUTPUT_ROOT', '')
+output_root = Path(output_root_str) if output_root_str else None
+git_commit = os.environ.get('GIT_COMMIT', 'unknown')
+pipeline_version = __version__
+
+generate_run_bundle_manifest(
+    run_dir=run_dir,
+    input_xlsx=input_xlsx,
+    config_dir=config_dir,
+    git_commit=git_commit,
+    pipeline_version=pipeline_version,
+    output_root=output_root
+)
+" || echo "Warning: could not generate run bundle manifest"
 
 # ---------------------------------------------------------------------
 # Footer
