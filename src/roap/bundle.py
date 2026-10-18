@@ -22,6 +22,7 @@ def generate_run_bundle_manifest(
     config_dir: Optional[Path],
     git_commit: str,
     pipeline_version: str,
+    output_root: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Generate a run bundle manifest with hashes and metadata.
 
@@ -40,9 +41,10 @@ def generate_run_bundle_manifest(
             if cfg_path.is_file():
                 config_files.append({"path": str(cfg_path.resolve()), "sha256": compute_file_hash(cfg_path)})
 
-    # Output files hashes (recursive from run_dir/oa_stage*_outputs/data/)
+    # Output files hashes (from output_root/oa_stage*_outputs/data/ if provided, else run_dir)
     output_files: list[Dict[str, str]] = []
-    for stage_dir in sorted(run_dir.glob("oa_stage*_outputs/data")):
+    search_root = output_root if output_root is not None else run_dir
+    for stage_dir in sorted(search_root.glob("oa_stage*_outputs/data")):
         for out_file in sorted(stage_dir.iterdir()):
             if out_file.is_file():
                 output_files.append({"path": str(out_file.resolve()), "sha256": compute_file_hash(out_file)})
@@ -71,7 +73,7 @@ def generate_run_bundle_manifest(
     return manifest
 
 
-def verify_bundle(run_dir: Path) -> bool:
+def verify_bundle(run_dir: Path, output_root: Optional[Path] = None) -> bool:
     """Verify a run bundle's integrity.
 
     Returns True if all hashes match the manifest, False otherwise.

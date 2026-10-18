@@ -9,4 +9,4 @@ carbonate_calc:
   enabled: true
   require_corrected_ta: true
   rm_reject_fraction_warn: 0.34
-# compatible_pipeline_version: '>=0.2.0'
+compatible_pipeline_version: '>=0.2.0'

@@ -30,4 +30,4 @@ thresholds:
   ph_diag_temp_sensitivity: -0.0165
   # ph_diag_tol left at its default (0.10); harmonization addresses the
   # offset directly rather than loosening the tolerance.
-# compatible_pipeline_version: '>=0.2.0'
+compatible_pipeline_version: '>=0.2.0'
