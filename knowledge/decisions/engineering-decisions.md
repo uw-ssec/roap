@@ -244,3 +244,130 @@ Lead ✅ **Implemented in**: P-1 migration (Week 1-2).
 - [AI-Friendly PRD](../project/ai-prd.md)
 - [Implementation Design](../../superpowers/specs/2026-10-05-roap-v1-implementation-design.md)
 - [Implementation Plan](../../superpowers/plans/2026-10-05-roap-v1-implementation-plan.md)
+
+---
+
+## 15. Git History Management: Individual Commits vs Squash Merge
+
+### Context
+
+During P-1 through P1 milestones, four PRs were squash-merged into main, collapsing 78 individual commits into a single mega-commit. This lost bisectability, blame accuracy, and reviewability.
+
+### Options Considered
+
+| Option                              | Description                                                        | Pros                                                            | Cons                                                |
+| ----------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------- |
+| **Keep squash merge**               | Leave history as single mega-commit                                | Simple; matches GitHub default                                  | Loses bisectability, blame accuracy, reviewability |
+| **Force-push rewritten history**    | Rebuild main with individual commits via cherry-pick/merge         | Restores bisectability, blame, reviewability; full transparency | Requires force-push; team must re-clone/rebase     |
+| **Leave as-is, document refs**      | Keep mega-commit, document feature branch refs in docs             | Zero disruption; history preserved in feature branches          | Bisect/blame still broken on main                  |
+
+### Decision
+
+**Selected: Force-push rewritten history** **Rationale**: Restoring individual commits restores `git bisect`, `git blame`, and per-commit reviewability. Feature branches (`feat/p1-migration`, `feat/p0-ci-invariant-readme`, `feat/p1-release-config-bundles`) preserved as permanent reference. Backup branch (`backup-main`) created for rollback. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `git push --force-with-lease` from rebuilt `main-rebuilt` branch. **Rollback**: `git push origin backup-main:main --force` if needed.
+
+---
+
+## 16. CI Setup-Pixi Action Version Pinning
+
+### Context
+
+The CI workflow used `prefix-dev/setup-pixi@v2` which doesn't exist (the action doesn't have a `v2` tag).
+
+### Decision
+
+**Selected: Pin to `v0.11.2`** **Rationale**: Explicit version pin avoids "tag not found" failures. Latest stable at time of fix was `v0.11.2`. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `.github/workflows/ci.yml` line 23.
+
+---
+
+## 17. CI Pre-Commit Caching and Timeout
+
+### Context
+
+CI failures on macOS/Ubuntu due to pre-commit exceeding 30-min timeout and no caching.
+
+### Decision
+
+**Selected: Add `actions/cache@v4` for `~/.cache/pre-commit` + 10-min timeout on pre-commit step** **Rationale**: Caches hooks across runs; timeout prevents stuck jobs. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `.github/workflows/ci.yml`.
+
+---
+
+## 18. CRM/TRIS Row Preservation in Stage 1B (Issue #29)
+
+### Context
+
+Pipeline was dropping CRM/TRIS rows in Stage 1B, losing audit trail.
+
+### Decision
+
+**Selected: Preserve all rows in `analysis_ready_subset()`; add `row_classification` column (`SAMPLE`/`CRM_QC`/`STD_QC`)** **Rationale**: CRM/TRIS rows are QC reference material; must appear in final output with appropriate verdicts (`CRM_QC`/`STD_QC`). **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/stage1b.py` (`classify_rows_sample`, `analysis_ready_subset`), test `tests/test_crm_tris_preservation.py`.
+
+---
+
+## 19. CRM Correction Robustness Without Config (Issue #30)
+
+### Context
+
+`build_corrections_table()` returned `None` when `group_by` not in columns, causing `AttributeError` in CRM correction during invariant tests (which run without `--config-dir`).
+
+### Decision
+
+**Selected: Ensure `build_corrections_table()` always returns DataFrame with fallback for non-grouped case** **Rationale**: Invariant tests run without config; pipeline must not crash. Fallback returns overall stats. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `src/roap/common.py:983-991` (fallback `return pd.DataFrame(...)`).
+
+---
+
+## 19. Run Bundle Manifest + Verify-Bundle CLI
+
+### Context
+
+Need immutable run records for reproducibility (P1.3).
+
+### Decision
+
+**Selected: `src/roap/bundle.py` with `generate_run_bundle_manifest()` + `verify_bundle()`; CLI `roap verify-bundle <run_dir> [--json]`** **Rationale**: SHA256 hashes of input/config/output files; git commit + pipeline version; JSON output for automation. **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/bundle.py`, `src/roap/cli.py`, `run_pipeline.sh` env export.
+
+---
+
+## 20. Config Compatibility Gate Enforcement (Vector #4)
+
+### Context
+
+Stale configs could silently produce wrong results.
+
+### Decision
+
+**Selected: Runtime gate in `load_config()` calling `check_config_compatibility()` with `compatible_pipeline_version` key in all 7 config YAMLs** **Rationale**: Fail fast with actionable error instead of silent drift. **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/common.py:594`, `tests/test_config_gate.py`.
+
+---
+
+## 21. Pipeline E2E Test Expectations Update
+
+### Context
+
+After CRM/TRIS preservation (Issue #29), pipeline output has 27 rows (20 samples + 4 CRM + 3 TRIS) instead of 20.
+
+### Decision
+
+**Selected: Update `EXPECTED_NON_PASS` in `tests/test_cli_pipeline.py` to include CRM_QC (4) + STD_QC (3) rows** **Rationale**: Test must match actual pipeline behavior post-fix. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `tests/test_cli_pipeline.py`.
+
+---
+
+## 22. Pre-Commit False Positive Suppression
+
+### Context
+
+`detect-secrets` flagged test fixture `git_commit="abc123def456"` as high-entropy string; `codespell` flagged domain abbreviations (`pres`→`press`, `pressent`→`present`).
+
+### Decision
+
+**Selected: Rename test fixture to `test-commit-abc123`; fix typos in `carbonate_calc.py`** **Rationale**: Avoid silencing security hooks; fix actual typos instead of allowlisting. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `tests/test_run_bundle.py`, `tests/test_verify_bundle_cli.py`, `src/roap/carbonate_calc.py`.
+
+---
+
+## Related Documents
+
+- [Council Review of Epic Plan](council-review.md)
+- [Architecture Decision Records](adrs.md)
+- [Prototype Migration Plan](migration-plan.md)
+- [AI-Friendly PRD](../project/ai-prd.md)
+- [Implementation Design](../../superpowers/specs/2026-10-05-roap-v1-implementation-design.md)
+- [Implementation Plan](../../superpowers/plans/2026-10-05-roap-v1-implementation-plan.md)

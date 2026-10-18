@@ -37,11 +37,10 @@ for `roap` v0.2.0) └── run_pipeline.sh (verified working)
 - ✅ **P-1.4**: Copy configs/ → configs/ (all 7 YAML configs including
   07_stage3.yaml with ph_diag_harmonize_temperature: true)
 - ✅ **P-1.5**: Create pyproject.toml for roap package (src-layout, v0.2.0)
-- ⚠️ **P-1.6**: Extract notebook orchestration → CLI entry points. Typer
-  scaffold, `roap` console script, and both subcommands exist, but
-  `validate` / `verify-bundle` are **stubs** — they print
-  `[STUB] ... not yet implemented` and `validate` exits 0 on an invalid
-  workbook. Validation logic is P3 (#19).
+- ✅ **P-1.6**: Extract notebook orchestration → CLI entry points. Typer
+  scaffold, `roap` console script, and both subcommands (`validate`,
+  `verify-bundle`) **fully implemented** (2026-10-11, `src/roap/cli.py`,
+  `src/roap/bundle.py`).
 - ✅ **P-1.7**: Add .gitignore entry for Unpublished data (runs/, outputs/,
   .pytest_runs/)
 - ✅ **P-1.8**: Verify: pixi install → pytest -q (373 pass, 1 by-design fail)
@@ -77,8 +76,12 @@ for `roap` v0.2.0) └── run_pipeline.sh (verified working)
 4. **Notebook updates**: All 11 notebooks updated from `from oa_pipeline.*` to
    `from roap.*`
 5. **Test updates**: All 329 tests updated to import from `roap` package
-6. **Pixi tasks**: Fixed `pipeline` task to use `./run_pipeline.sh`; `validate`
+5. **Pixi tasks**: Fixed `pipeline` task to use `./run_pipeline.sh`; `validate`
    and `verify-bundle` now use `roap` CLI
+6. **History restoration**: Squash-merged PRs (#26, #28, #31, #32) were
+   deconstructed; 44 individual commits restored to `main` via force-push
+   (2026-10-18). Backup branch `backup-main` created at original mega-commit
+   (`463f2a9`). Feature branches preserved for reference.
 
 ## GitHub Issues Resolved (P-1 Migration)
 
