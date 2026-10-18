@@ -33,9 +33,18 @@ jobs:
         run: pixi install
         shell: bash
 
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            pre-commit-${{ runner.os }}-
+
       - name: Run pre-commit checks
         run: pixi run pre-commit-all
         shell: bash
+        timeout-minutes: 10
 
       - name: Run test suite
         run: pytest -q --tb=short
