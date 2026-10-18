@@ -25,7 +25,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Pixi
-        uses: pixi-actions/setup-pixi@v2
+        uses: prefix-dev/setup-pixi@v2
         with:
           pixi-version: "latest"
 
