@@ -29,7 +29,9 @@ FINAL_REL = Path("oa_stage4_outputs") / "data" / "analysis_ready.csv"
 # From examples/make_example_data.py EXPECTED_STAGE4_OUTCOMES.
 EXPECTED_FAIL = {"S007", "S010", "S015"}
 EXPECTED_REVIEW = {"S005"}
-EXPECTED_NON_PASS = EXPECTED_FAIL | EXPECTED_REVIEW
+EXPECTED_CRM_QC = {"RM213_1", "RM213_2", "RM213_3", "RM213_4"}
+EXPECTED_STD_QC = {"TRIS_1", "TRIS_2", "TRIS_3"}
+EXPECTED_NON_PASS = EXPECTED_FAIL | EXPECTED_REVIEW | EXPECTED_CRM_QC | EXPECTED_STD_QC
 
 
 def test_run_pipeline_sh_exists() -> None:
@@ -78,7 +80,7 @@ def test_pipeline_runs_end_to_end(tmp_path: Path) -> None:
     assert final.exists(), f"Missing final deliverable: {final}"
 
     df = pd.read_csv(final)
-    assert len(df) == 20, f"Expected 20 sample rows, got {len(df)}"
+    assert len(df) == 27, f"Expected 20 sample rows, got {len(df)}"
 
     status = df.set_index("sample_tag")["analysis_audit_status"]
     non_pass = set(status[status != "PASS"].index)
