@@ -9,7 +9,7 @@ def test_generate_run_bundle_manifest(tmp_path):
     """Manifest generated with correct structure and hashes."""
     from roap.bundle import generate_run_bundle_manifest
     from roap import __version__
-    
+
     # Create test files
     run_dir = tmp_path / "runs" / "2026-10-11T12-00-00Z_pid123"
     run_dir.mkdir(parents=True)
@@ -18,23 +18,23 @@ def test_generate_run_bundle_manifest(tmp_path):
     config_dir = tmp_path / "configs"
     config_dir.mkdir()
     (config_dir / "02_ta_ph_qc.yaml").write_text("compatible_pipeline_version: '>=0.2.0'\n")
-    
+
     # Create output files
     out_data = run_dir / "oa_stage4_outputs" / "data"
     out_data.mkdir(parents=True)
     (out_data / "analysis_ready.csv").write_text("col1,col2\n1,2\n")
-    
+
     manifest = generate_run_bundle_manifest(
         run_dir=run_dir,
         input_xlsx=input_xlsx,
         config_dir=config_dir,
-        git_commit="abc123def456",
+        git_commit="test-commit-abc123",
         pipeline_version=__version__
     )
-    
+
     # Verify structure
     assert manifest["schema_version"] == "1.0"
-    assert manifest["git_commit"] == "abc123def456"
+    assert manifest["git_commit"] == "test-commit-abc123"
     assert manifest["pipeline_version"] == __version__
     assert "timestamp" in manifest
     assert manifest["input_file"]["sha256"] == compute_file_hash(input_xlsx)

@@ -59,7 +59,7 @@ CARBONATE_CALC_DEFAULTS: Dict[str, Any] = {
         "hco3": "hco3_calc_umol_kg",
         "co3": "co3_calc_umol_kg",
         "revelle": "revelle_factor_calc",
-        "ph_insitu": "ph_co2sys",  # calculated pH re-expressed at in-situ T
+        "ph_insitu": "ph_co2sys",  # calculated pH re-expresssed at in-situ T
     },
     # Only compute where TA was actually correction-resolved. If True, rows
     # whose TA correction was withheld/failed still get computed (from whatever
@@ -164,7 +164,7 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
     sal_col = _first_present(out, cols["sal"])
     tlab_col = _first_present(out, cols["temp_lab"])
     tins_col = _first_present(out, cols["temp_insitu"])
-    pres_col = _first_present(out, cols["pressure_insitu"])
+    press_col = _first_present(out, cols["pressure_insitu"])
     si_col = _first_present(out, cols["silicate"])
     po4_col = _first_present(out, cols["phosphate"])
 
@@ -173,7 +173,7 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
     sal = _num(out, sal_col)
     tlab = _num(out, tlab_col)
     tins = _num(out, tins_col)
-    pres = _num(out, pres_col)
+    press = _num(out, press_col)
 
     missing = [name for name, s in [("TA", ta), ("pH", ph), ("salinity", sal),
                                     ("temp_lab", tlab), ("temp_insitu", tins)] if s is None]
@@ -185,10 +185,10 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
         )
     notes.append(f"Inputs: TA='{ta_col}', pH='{ph_col}', sal='{sal_col}', "
                  f"temp_lab='{tlab_col}', temp_insitu='{tins_col}', "
-                 f"pressure='{pres_col or 'none->0'}'.")
+                 f"pressure='{press_col or 'none->0'}'.")
 
     # pressure: surface (0) at measurement, in-situ at collection.
-    pres_out = pres if pres is not None else pd.Series(0.0, index=out.index)
+    press_out = press if press is not None else pd.Series(0.0, index=out.index)
 
     # nutrients -> umol/kg (default 0 where absent, as Excel-blank behaviour)
     si = _to_umol_kg(_num(out, si_col), sal, tlab) if si_col else None
@@ -215,7 +215,7 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
         temperature=tlab[solvable].to_numpy(float),        # input: lab temp
         temperature_out=tins[solvable].to_numpy(float),    # output: in-situ temp
         pressure=np.zeros(n_solvable),                     # input: ~0 dbar (lab)
-        pressure_out=pres_out[solvable].to_numpy(float),   # output: in-situ dbar
+        pressure_out=press_out[solvable].to_numpy(float),   # output: in-situ dbar
         opt_pH_scale=cfg["opt_pH_scale"],
         opt_k_carbonic=cfg["opt_k_carbonic"],
         opt_k_bisulfate=cfg["opt_k_bisulfate"],
@@ -241,7 +241,7 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
     out.loc[idx, o["hco3"]] = res["HCO3_out"]
     out.loc[idx, o["co3"]] = res["CO3_out"]
     out.loc[idx, o["revelle"]] = res["revelle_factor_out"]
-    # calculated pH re-expressed at in-situ temperature (for the QC cross-check)
+    # calculated pH re-expresssed at in-situ temperature (for the QC cross-check)
     out.loc[idx, o["ph_insitu"]] = res["pH_out"]
 
     # ---- provenance stamps (constant across sample rows) ----
