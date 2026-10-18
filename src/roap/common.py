@@ -979,6 +979,14 @@ def build_corrections_table(
 
         return grp
 
+    return pd.DataFrame(
+        {
+            "overall_n": [overall_n],
+            "overall_correction": [overall_mean],
+            "overall_sd": [overall_sd],
+        }
+    )
+
 
 def check_config_compatibility(config: dict, config_name: str) -> None:
     """Enforce compatible_pipeline_version gate. Exits if version mismatch."""
