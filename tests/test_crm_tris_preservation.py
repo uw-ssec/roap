@@ -13,7 +13,7 @@ def test_classify_rows_sample_preserves_crm_tris():
         "ta_best_umolkg": [2300.0, 2310.0, 2200.0, 2305.0],
         "ph_best": [8.1, 8.05, 8.08, 8.06],
     })
-    
+
     is_sample = classify_rows_sample(df)
     # CRM and TRIS rows should be "CRM"/"STD" (not "SAMPLE")
     assert is_sample.iloc[0] == "SAMPLE"   # S1
@@ -37,21 +37,21 @@ def test_analysis_ready_subset_preserves_all_rows():
         "phstd_status_norm": ["PASS", "PASS", "PASS", "PASS"],
         "phstd_correction_applied": [False]*4,
     })
-    
+
     # Add required columns for analysis_ready_subset
     for col in ["flag_lat_out_of_range", "flag_lon_out_of_range", "flag_sal_out_of_range",
                 "flag_depth_out_of_range", "flag_calc_temperature_out_of_range",
                 "flag_ta_out_of_range", "flag_ph_out_of_range", "flag_ta_non_numeric",
                 "flag_ph_non_numeric", "flag_sal_non_numeric", "flag_calc_temperature_non_numeric",
-                "flag_ta_units_missing", "flag_ta_units_unexpected", 
+                "flag_ta_units_missing", "flag_ta_units_unexpected",
                 "flag_ph_scale_observed_missing", "flag_ph_scale_observed_unexpected",
                 "flag_core_chemistry_missing"]:
         df[col] = False
-    
+
     result = analysis_ready_subset(df, STAGE1B_DEFAULTS)
-    
+
     # Should have ALL 4 rows, not just 2 samples
     assert len(result) == 4, f"Expected 4 rows, got {len(result)}"
-    
+
     # Sample rows get PASS/REVIEW/FAIL, CRM/TRIS get CRM_QC/STD_QC
     statuses = result.set_index("sample_tag")["safe_for_analysis_strict"]

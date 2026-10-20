@@ -191,7 +191,7 @@ def test_stage_invariant_columns(stage_name, tmp_path):
     assert_untouched_unchanged(input_df, output_df, target_cols, stage_name)
 
 
-def test_lat_lon_never_mutated():
+def test_lat_lon_never_mutated(bash_exe):
     """Specific regression test for the lat/lon overwrite bug (Vector #5)."""
     input_path = Path("examples/example_data.xlsx")
     input_df = pd.read_excel(input_path)
@@ -204,7 +204,7 @@ def test_lat_lon_never_mutated():
     with tempfile.TemporaryDirectory() as tmpdir:
         output_dir = Path(tmpdir) / "outputs"
         result = subprocess.run(
-            ["./run_pipeline.sh", str(input_path), str(output_dir)],
+            [bash_exe, "./run_pipeline.sh", input_path.as_posix(), output_dir.as_posix()],
             capture_output=True, text=True, timeout=300
         )
         assert result.returncode == 0, f"Pipeline failed: {result.stderr}"
@@ -223,7 +223,7 @@ def test_lat_lon_never_mutated():
         )
 
 
-def test_provenance_columns_never_mutated():
+def test_provenance_columns_never_mutated(bash_exe):
     """Provenance columns must not be silently overwritten."""
     input_path = Path("examples/example_data.xlsx")
     input_df = pd.read_excel(input_path)
@@ -239,7 +239,7 @@ def test_provenance_columns_never_mutated():
     with tempfile.TemporaryDirectory() as tmpdir:
         output_dir = Path(tmpdir) / "outputs"
         result = subprocess.run(
-            ["./run_pipeline.sh", str(input_path), str(output_dir)],
+            [bash_exe, "./run_pipeline.sh", input_path.as_posix(), output_dir.as_posix()],
             capture_output=True, text=True, timeout=300
         )
         assert result.returncode == 0

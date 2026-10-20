@@ -13,8 +13,8 @@ If you can pick a file and click a button, you can use Alka.
 
 1. You choose an input workbook (`.xlsx`) and an output folder.
 2. You tick **Compute carbonate chemistry internally** (recommended) — this runs
-   the pipeline's own PyCO2SYS calculation from RM-corrected total alkalinity, so
-   the reported DIC / Ω / pCO₂ are consistent with the corrected TA.
+   the pipeline's own PyCO2SYS calculation from RM-corrected total alkalinity,
+   so the reported DIC / Ω / pCO₂ are consistent with the corrected TA.
 3. You click **Run pipeline**.
 4. When it finishes, Alka shows:
    - the **verdict counts** (PASS / REVIEW / FAIL) for the run;
@@ -23,8 +23,8 @@ If you can pick a file and click a button, you can use Alka.
    - buttons to **open the output folder** and **open a figures notebook**
      pointed at this run's results.
 
-The heavy lifting is done by the same, tested pipeline used on the command line —
-Alka is a friendly front end, not a separate implementation.
+The heavy lifting is done by the same, tested pipeline used on the command line
+— Alka is a friendly front end, not a separate implementation.
 
 ---
 
@@ -55,9 +55,9 @@ The Alka window opens. (On Windows, use the `.venv` Python, e.g.
 
 ## Using it, step by step
 
-1. **Data → Input workbook:** click *Browse…* and pick your `.xlsx`
-   (e.g. the cruise workbook, or a prepared provenance file).
-2. **Data → Output folder:** click *Browse…* and pick where results should go
+1. **Data → Input workbook:** click _Browse…_ and pick your `.xlsx` (e.g. the
+   cruise workbook, or a prepared provenance file).
+2. **Data → Output folder:** click _Browse…_ and pick where results should go
    (e.g. `data/processed`).
 3. **Options → Compute carbonate chemistry internally:** leave this ticked
    unless you are deliberately supplying externally-computed chemistry.
@@ -67,7 +67,7 @@ The Alka window opens. (On Windows, use the `.venv` Python, e.g.
 6. When it finishes, read the **Results** panel:
    - **Verdicts** — how many sample rows passed, need review, or failed.
    - **Duplicate precision** — measurement reproducibility vs the
-     weather-quality tolerance, with a *Show duplicate pairs* button revealing
+     weather-quality tolerance, with a _Show duplicate pairs_ button revealing
      the per-pair differences behind the summary.
    - Hover the **ⓘ** next to "Duplicate precision" for an explanation of how the
      numbers are derived.
@@ -79,9 +79,9 @@ The Alka window opens. (On Windows, use the `.venv` Python, e.g.
 ## Understanding the results
 
 - **Verdicts** come from the pipeline's audit of each sample row.
-- **Duplicate precision** uses the GOA-ON Cookbook statistic
-  (precision = 2.2 × SD/√n). "Above tolerance" is a data-quality finding to
-  review, not a pipeline error — see `duplicate_pairs_panel_explained.md` and
+- **Duplicate precision** uses the GOA-ON Cookbook statistic (precision = 2.2 ×
+  SD/√n). "Above tolerance" is a data-quality finding to review, not a pipeline
+  error — see `duplicate_pairs_panel_explained.md` and
   `duplicate_precision_methods.md` for the full explanation.
 - The **carbonate calculation** settings (Lueker 2000; Dickson KSO₄; Lee 2010
   borate; Perez & Fraga KF; total pH scale) are pinned and validated against the
@@ -92,13 +92,14 @@ The Alka window opens. (On Windows, use the `.venv` Python, e.g.
 ## Troubleshooting
 
 - **"bash not found"** — install Git Bash (Windows) and relaunch.
-- **"Jupyter is not installed"** when clicking *Open figures notebook* — run
+- **"Jupyter is not installed"** when clicking _Open figures notebook_ — run
   `pip install jupyterlab`, or open the prepared notebook manually (Alka saves a
   copy named `figures_<timestamp>.ipynb` in your output folder).
 - **The window looks cut off** — the whole window scrolls; use the scrollbar or
   mouse wheel to reach the results and log.
-- **A run fails** — the log shows the error. Because the pipeline is the same one
-  used on the command line, any command-line troubleshooting applies here too.
+- **A run fails** — the log shows the error. Because the pipeline is the same
+  one used on the command line, any command-line troubleshooting applies here
+  too.
 
 ---
 

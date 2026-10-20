@@ -11,16 +11,16 @@
 ## QC flag scale (0-9)
 
 | Flag | Conventional meaning                                       |
-| ---- | ------------------------------------------------------------ |
-| 1    | Sample drawn but not analyzed                                 |
-| 2    | **Acceptable measurement** (confirmed by paper)               |
-| 3    | Questionable / suspect measurement                            |
-| 4    | Bad measurement                                                |
-| 5    | Not reported                                                   |
-| 6    | Mean of replicate measurements                                 |
-| 7    | Manually integrated chromatographic peak (method-specific)     |
-| 8    | Irregular digital chromatographic peak (method-specific)       |
-| 9    | **Missing** (confirmed by paper)                               |
+| ---- | ---------------------------------------------------------- |
+| 1    | Sample drawn but not analyzed                              |
+| 2    | **Acceptable measurement** (confirmed by paper)            |
+| 3    | Questionable / suspect measurement                         |
+| 4    | Bad measurement                                            |
+| 5    | Not reported                                               |
+| 6    | Mean of replicate measurements                             |
+| 7    | Manually integrated chromatographic peak (method-specific) |
+| 8    | Irregular digital chromatographic peak (method-specific)   |
+| 9    | **Missing** (confirmed by paper)                           |
 
 Flag `0` is typically reserved as "no QC performed yet" in similar schemes —
 confirm this against the paper before relying on it.
@@ -32,11 +32,11 @@ paper's stated examples — extend this table as more legacy-to-standard mapping
 are identified during the codebase audit):
 
 | Legacy WOCE Exchange abbreviation | Standard clarified name            |
-| ---------------------------------- | ------------------------------------ |
-| `SILCAT`                          | Silicate                             |
-| `NH4`                             | Ammonium                             |
-| `PHSPHT`                          | Phosphate _(verify against paper)_   |
-| `NITRAT`                          | Nitrate _(verify against paper)_     |
+| --------------------------------- | ---------------------------------- |
+| `SILCAT`                          | Silicate                           |
+| `NH4`                             | Ammonium                           |
+| `PHSPHT`                          | Phosphate _(verify against paper)_ |
+| `NITRAT`                          | Nitrate _(verify against paper)_   |
 
 ## Missing value sentinel
 

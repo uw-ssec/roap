@@ -19,8 +19,8 @@ review (NB 03) notebooks, or do a **dry run** (shows the steps, writes nothing).
 
 ## Requirements (one-time setup)
 
-The launcher window itself needs only standard Python — **Tkinter ships with
-the official python.org installer** on Windows and macOS. On some minimal Linux
+The launcher window itself needs only standard Python — **Tkinter ships with the
+official python.org installer** on Windows and macOS. On some minimal Linux
 installs you may need: `sudo apt install python3-tk`.
 
 The pipeline it runs needs the project installed once:
@@ -42,7 +42,8 @@ the log, rather than failing with a traceback.
 Put the file in the project root (the folder with `run_pipeline.sh`,
 `notebooks/`, `src/oa_pipeline/`), then:
 
-- **Windows:** double-click `oa_pipeline_app.py`, or run `python oa_pipeline_app.py`
+- **Windows:** double-click `oa_pipeline_app.py`, or run
+  `python oa_pipeline_app.py`
 - **macOS:** `python3 oa_pipeline_app.py`
 - **Linux:** `python3 oa_pipeline_app.py`
 

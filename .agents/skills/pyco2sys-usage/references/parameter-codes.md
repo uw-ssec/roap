@@ -13,15 +13,15 @@
 Identifies which physical quantity each of `par1`/`par2` represents:
 
 | Code | Parameter                        | Typical unit                                |
-| ---- | --------------------------------- | -------------------------------------------- |
-| 1    | Total Alkalinity (TA)            | umol/kg                                       |
-| 2    | Dissolved Inorganic Carbon (DIC) | umol/kg                                       |
-| 3    | pH                               | dimensionless (scale set by `opt_pH_scale`)   |
-| 4    | Partial pressure of CO2 (pCO2)   | uatm                                          |
-| 5    | Fugacity of CO2 (fCO2)           | uatm                                          |
-| 6    | Carbonate ion (CO3--)            | umol/kg                                       |
-| 7    | Bicarbonate ion (HCO3-)          | umol/kg                                       |
-| 8    | Aqueous CO2                      | umol/kg                                       |
+| ---- | -------------------------------- | ------------------------------------------- |
+| 1    | Total Alkalinity (TA)            | umol/kg                                     |
+| 2    | Dissolved Inorganic Carbon (DIC) | umol/kg                                     |
+| 3    | pH                               | dimensionless (scale set by `opt_pH_scale`) |
+| 4    | Partial pressure of CO2 (pCO2)   | uatm                                        |
+| 5    | Fugacity of CO2 (fCO2)           | uatm                                        |
+| 6    | Carbonate ion (CO3--)            | umol/kg                                     |
+| 7    | Bicarbonate ion (HCO3-)          | umol/kg                                     |
+| 8    | Aqueous CO2                      | umol/kg                                     |
 
 This project's standard pairing: `par1_type=1` (TA), `par2_type=2` (DIC).
 

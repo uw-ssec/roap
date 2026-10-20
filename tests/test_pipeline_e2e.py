@@ -32,30 +32,6 @@ pytest.importorskip("papermill")
 # =============================================================================
 
 
-def _find_git_bash() -> str | None:
-    """Prefer Git Bash over WSL bash on Windows.
-
-    On Windows, a generic PATH lookup can find WSL bash. WSL bash can mangle
-    Windows style paths used by this test, so Windows requires Git Bash.
-    Non Windows platforms can use bash from PATH.
-    """
-    candidates = [
-        Path(os.environ.get("ProgramFiles", "")) / "Git" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles", "")) / "Git" / "usr" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "usr" / "bin" / "bash.exe",
-    ]
-
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-
-    if os.name == "nt":
-        return None
-
-    return shutil.which("bash")
-
-
 def _path_arg(path: Path, project_root: Path) -> str:
     """Use project relative POSIX path when possible, otherwise absolute POSIX path."""
     path = path.resolve()
@@ -150,6 +126,7 @@ def pipeline_outputs(
     project_root: Path,
     example_xlsx_path: Path,
     tmp_path_factory: pytest.TempPathFactory,
+    bash_exe: str,
 ) -> Path:
     """Run the notebook pipeline once; tests in this module share the output."""
     runner = project_root / "run_pipeline.sh"
@@ -171,10 +148,6 @@ def pipeline_outputs(
             "roap is not importable in the pytest process. Run "
             "`python -m pip install -e \".[dev]\"` before running the E2E test."
         )
-
-    bash_exe = _find_git_bash()
-    if bash_exe is None:
-        pytest.skip("bash not found on PATH")
 
     out_root = _make_test_output_root(project_root, tmp_path_factory)
 
@@ -286,6 +259,7 @@ def test_runner_dry_run_succeeds(
     project_root: Path,
     example_xlsx_path: Path,
     tmp_path: Path,
+    bash_exe: str,
 ) -> None:
     """The runner should parse arguments and print commands in dry run mode."""
     runner = project_root / "run_pipeline.sh"
@@ -296,10 +270,6 @@ def test_runner_dry_run_succeeds(
             f"{example_xlsx_path} not present. Run "
             "`python examples/make_example_data.py` to regenerate it."
         )
-
-    bash_exe = _find_git_bash()
-    if bash_exe is None:
-        pytest.skip("bash not found")
 
     env = os.environ.copy()
     env["PYTHON_BIN"] = sys.executable
@@ -482,7 +452,7 @@ def test_only_sample_rows_in_final_output(pipeline_outputs: Path) -> None:
     assert len(analysis_ready) == row_counts.get("n_rows")
     # CRM and TRIS rows are now preserved in the final output
     assert len(analysis_ready) == 27, f"Expected 27 rows (20 samples + 4 CRM + 3 TRIS), got {len(analysis_ready)}"
-    
+
     # Verify CRM and TRIS rows have appropriate audit statuses
     audit_statuses = analysis_ready["analysis_audit_status"].value_counts()
     assert "CRM_QC" in audit_statuses, "CRM_QC verdict should be present"
@@ -496,13 +466,17 @@ def test_verdict_distribution_matches_injected_issues(pipeline_outputs: Path) ->
     analysis_ready = _load_final(pipeline_outputs)
     counts = analysis_ready["analysis_audit_status"].value_counts()
 
-    n_non_pass = int((analysis_ready["analysis_audit_status"] != "PASS").sum())
+    # CRM and TRIS rows carry their own QC verdicts; only sample rows count.
+    status = analysis_ready["analysis_audit_status"]
+    samples = status[~status.isin(["CRM_QC", "STD_QC"])]
+    assert len(samples) == 20, f"Expected 20 sample rows, got {len(samples)}"
+    n_non_pass = int((samples != "PASS").sum())
 
     assert 4 <= n_non_pass <= 8, (
         f"Expected 4 to 8 non PASS rows from deliberate injections, got "
         f"{n_non_pass}. Distribution: {counts.to_dict()}"
     )
-    assert set(counts.index) <= {"PASS", "REVIEW", "FAIL"}
+    assert set(counts.index) <= {"PASS", "REVIEW", "FAIL", "CRM_QC", "STD_QC"}
 
 
 def test_final_output_does_not_globally_fail_for_missing_carbonate_provenance(
@@ -596,13 +570,18 @@ def test_stage4_manifest_records_row_counts(pipeline_outputs: Path) -> None:
     row_counts = manifest.get("row_counts", {})
 
     assert row_counts.get("n_rows") == len(analysis_ready)
-    assert row_counts.get("n_rows") == 20
+    # 20 samples + 4 CRM + 3 TRIS
+    assert row_counts.get("n_rows") == 27
     assert "status_PASS" in row_counts
     assert "status_REVIEW" in row_counts
     assert "status_FAIL" in row_counts
+    assert row_counts.get("status_CRM_QC") == 4
+    assert row_counts.get("status_STD_QC") == 3
 
     assert (
         row_counts["status_PASS"]
         + row_counts["status_REVIEW"]
         + row_counts["status_FAIL"]
+        + row_counts["status_CRM_QC"]
+        + row_counts["status_STD_QC"]
     ) == row_counts["n_rows"]

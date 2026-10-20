@@ -43,9 +43,9 @@ for `roap` v0.2.0) └── run_pipeline.sh (verified working)
   `src/roap/bundle.py`).
 - ✅ **P-1.7**: Add .gitignore entry for Unpublished data (runs/, outputs/,
   .pytest_runs/)
-- ✅ **P-1.8**: Verify: pixi install → pytest -q (373 pass, 1 by-design fail)
-  → ./run_pipeline.sh on synthetic data → 4 non-PASS verdicts
-  (16 PASS / 3 FAIL / 1 REVIEW), ~34s
+- ✅ **P-1.8**: Verify: pixi install → pytest -q (373 pass, 1 by-design fail) →
+  ./run_pipeline.sh on synthetic data → 4 non-PASS verdicts (16 PASS / 3 FAIL /
+  1 REVIEW), ~34s
 
 ## Success Criteria
 
@@ -57,8 +57,8 @@ for `roap` v0.2.0) └── run_pipeline.sh (verified working)
 - ✅ configs/ has all YAML configs including 07_stage3.yaml with
   ph_diag_harmonize_temperature: true
 - ✅ ./run_pipeline.sh works end-to-end on synthetic data (37s full pipeline)
-- ⚠️ Unpublished data NOT in **this repo's** git history — verified by
-  scanning every blob in `551a51b..HEAD`. However
+- ⚠️ Unpublished data NOT in **this repo's** git history — verified by scanning
+  every blob in `551a51b..HEAD`. However
   `test_no_unpublished_data.py::test_prototype_submodule_has_no_stored_outputs`
   **fails by design**: the pinned upstream submodule
   (`reez-png/oa_pipeline@3d125b3`, public) carries executed notebook outputs
@@ -76,21 +76,21 @@ for `roap` v0.2.0) └── run_pipeline.sh (verified working)
 4. **Notebook updates**: All 11 notebooks updated from `from oa_pipeline.*` to
    `from roap.*`
 5. **Test updates**: All 329 tests updated to import from `roap` package
-5. **Pixi tasks**: Fixed `pipeline` task to use `./run_pipeline.sh`; `validate`
+6. **Pixi tasks**: Fixed `pipeline` task to use `./run_pipeline.sh`; `validate`
    and `verify-bundle` now use `roap` CLI
-6. **History restoration**: Squash-merged PRs (#26, #28, #31, #32) were
+7. **History restoration**: Squash-merged PRs (#26, #28, #31, #32) were
    deconstructed; 44 individual commits restored to `main` via force-push
    (2026-10-18). Backup branch `backup-main` created at original mega-commit
    (`463f2a9`). Feature branches preserved for reference.
 
 ## GitHub Issues Resolved (P-1 Migration)
 
-| Issue | Title                                                                       | Status  |
-| ----- | --------------------------------------------------------------------------- | ------- |
-| #6    | feat(p1): Package setup — pyproject.toml, pixi.toml tasks                   | ⚠️ Partial (stub CLI) |
-| #7    | feat(p1): Core modules — migrate src/oa_pipeline/ (12 modules)              | ✅ Done |
-| #8    | test(p1): Tests & configs — migrate tests/, configs/, examples/, notebooks/ | ✅ Done |
-| #9    | feat(p1): CLI & GUI — migrate run_pipeline.sh, app, stamp scripts           | ⚠️ Partial (stub CLI) |
+| Issue | Title                                                                       | Status                                 |
+| ----- | --------------------------------------------------------------------------- | -------------------------------------- |
+| #6    | feat(p1): Package setup — pyproject.toml, pixi.toml tasks                   | ⚠️ Partial (stub CLI)                  |
+| #7    | feat(p1): Core modules — migrate src/oa_pipeline/ (12 modules)              | ✅ Done                                |
+| #8    | test(p1): Tests & configs — migrate tests/, configs/, examples/, notebooks/ | ✅ Done                                |
+| #9    | feat(p1): CLI & GUI — migrate run_pipeline.sh, app, stamp scripts           | ⚠️ Partial (stub CLI)                  |
 | #10   | test(p1): Verification — no unpublished data, full pipeline E2E             | ✅ Done (submodule exposure escalated) |
 
 ## Related Concepts
