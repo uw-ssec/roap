@@ -74,7 +74,7 @@ def test_gui_app_compiles() -> None:
 
 def test_gui_app_imports_core_as_sibling() -> None:
     """Both files must live together; a split would break the bare import."""
-    source = APP.read_text()
+    source = APP.read_text(encoding="utf-8")
     assert "from roap_app_core import" in source
     assert APP.parent == APP_CORE.parent, "app and app_core must share a directory"
 

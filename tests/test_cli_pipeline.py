@@ -12,7 +12,6 @@ This test asserts the generator's documented EXPECTED_STAGE4_OUTCOMES.
 """
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,13 +42,10 @@ def test_run_pipeline_sh_executable() -> None:
     assert os.access(RUNNER, os.X_OK), "run_pipeline.sh not executable"
 
 
-def test_run_pipeline_dry_run_succeeds(tmp_path: Path) -> None:
+def test_run_pipeline_dry_run_succeeds(tmp_path: Path, bash_exe: str) -> None:
     """--dry-run resolves notebooks and prints the chain without executing."""
-    if not shutil.which("bash"):
-        pytest.skip("bash not available")
-
     result = subprocess.run(
-        ["bash", str(RUNNER), str(EXAMPLE_XLSX), str(tmp_path / "out"), "--dry-run"],
+        [bash_exe, RUNNER.as_posix(), EXAMPLE_XLSX.as_posix(), (tmp_path / "out").as_posix(), "--dry-run"],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
@@ -60,14 +56,11 @@ def test_run_pipeline_dry_run_succeeds(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
-def test_pipeline_runs_end_to_end(tmp_path: Path) -> None:
+def test_pipeline_runs_end_to_end(tmp_path: Path, bash_exe: str) -> None:
     """Full Papermill run produces the final deliverable with injected issues."""
-    if not shutil.which("bash"):
-        pytest.skip("bash not available")
-
     out_root = tmp_path / "out"
     result = subprocess.run(
-        ["bash", str(RUNNER), str(EXAMPLE_XLSX), str(out_root)],
+        [bash_exe, RUNNER.as_posix(), EXAMPLE_XLSX.as_posix(), out_root.as_posix()],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,

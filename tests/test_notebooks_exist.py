@@ -34,7 +34,7 @@ def test_notebook_exists(nb: str) -> None:
 @pytest.mark.parametrize("nb", NOTEBOOKS)
 def test_notebook_is_valid_json_with_cells(nb: str) -> None:
     """A notebook that does not parse would fail only at Papermill runtime."""
-    data = json.loads((NOTEBOOK_DIR / nb).read_text())
+    data = json.loads((NOTEBOOK_DIR / nb).read_text(encoding="utf-8"))
     assert "cells" in data, f"{nb} has no cells key"
     assert isinstance(data["cells"], list), f"{nb} cells is not a list"
 
@@ -51,7 +51,7 @@ def test_notebook_has_no_stored_outputs(nb: str) -> None:
     Committing those would put unpublished data in git history permanently,
     so outputs are stripped on migration and must stay stripped.
     """
-    data = json.loads((NOTEBOOK_DIR / nb).read_text())
+    data = json.loads((NOTEBOOK_DIR / nb).read_text(encoding="utf-8"))
     offenders = [
         i
         for i, c in enumerate(data["cells"])
@@ -71,7 +71,7 @@ def test_all_runner_notebooks_are_present() -> None:
 
     import re
 
-    referenced = set(re.findall(r"[0-9A-Za-z_]+\.ipynb", runner.read_text()))
+    referenced = set(re.findall(r"[0-9A-Za-z_]+\.ipynb", runner.read_text(encoding="utf-8")))
     # run.ipynb is the per-run output artifact Papermill writes, not an input.
     referenced.discard("run.ipynb")
 

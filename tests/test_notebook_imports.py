@@ -31,7 +31,7 @@ _WINDOWS_PATH_MARKER = r"C:\Users"
 
 
 def _code_lines(nb_path: Path):
-    nb = json.loads(nb_path.read_text())
+    nb = json.loads(nb_path.read_text(encoding="utf-8"))
     for idx, cell in enumerate(nb.get("cells", [])):
         if cell.get("cell_type") != "code":
             continue
@@ -61,7 +61,7 @@ def test_stage4_carbonate_import_is_not_swallowed() -> None:
     If it does, a broken install silently yields no chemistry while the
     pipeline reports success.
     """
-    nb = json.loads((REPO_ROOT / "notebooks" / "08_stage4.ipynb").read_text())
+    nb = json.loads((REPO_ROOT / "notebooks" / "08_stage4.ipynb").read_text(encoding="utf-8"))
 
     cell_src = None
     for cell in nb["cells"]:

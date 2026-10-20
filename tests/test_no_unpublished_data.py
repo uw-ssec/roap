@@ -67,7 +67,7 @@ def test_prototype_submodule_has_no_stored_outputs() -> None:
     offenders = []
     for nb_path in sorted(sub.glob("notebooks/*.ipynb")):
         try:
-            nb = json.loads(nb_path.read_text())
+            nb = json.loads(nb_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         for i, cell in enumerate(nb.get("cells", [])):
@@ -143,7 +143,7 @@ def test_notebooks_carry_no_stored_outputs() -> None:
     """Executed outputs can embed real measurements (see P1-07)."""
     offenders = []
     for nb_path in sorted((REPO_ROOT / "notebooks").glob("*.ipynb")):
-        nb = json.loads(nb_path.read_text())
+        nb = json.loads(nb_path.read_text(encoding="utf-8"))
         for i, cell in enumerate(nb["cells"]):
             if cell.get("cell_type") == "code" and (
                 cell.get("outputs") or cell.get("execution_count")

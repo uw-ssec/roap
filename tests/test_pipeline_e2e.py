@@ -32,30 +32,6 @@ pytest.importorskip("papermill")
 # =============================================================================
 
 
-def _find_git_bash() -> str | None:
-    """Prefer Git Bash over WSL bash on Windows.
-
-    On Windows, a generic PATH lookup can find WSL bash. WSL bash can mangle
-    Windows style paths used by this test, so Windows requires Git Bash.
-    Non Windows platforms can use bash from PATH.
-    """
-    candidates = [
-        Path(os.environ.get("ProgramFiles", "")) / "Git" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles", "")) / "Git" / "usr" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "bin" / "bash.exe",
-        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "usr" / "bin" / "bash.exe",
-    ]
-
-    for candidate in candidates:
-        if candidate.exists():
-            return str(candidate)
-
-    if os.name == "nt":
-        return None
-
-    return shutil.which("bash")
-
-
 def _path_arg(path: Path, project_root: Path) -> str:
     """Use project relative POSIX path when possible, otherwise absolute POSIX path."""
     path = path.resolve()
@@ -150,6 +126,7 @@ def pipeline_outputs(
     project_root: Path,
     example_xlsx_path: Path,
     tmp_path_factory: pytest.TempPathFactory,
+    bash_exe: str,
 ) -> Path:
     """Run the notebook pipeline once; tests in this module share the output."""
     runner = project_root / "run_pipeline.sh"
@@ -171,10 +148,6 @@ def pipeline_outputs(
             "roap is not importable in the pytest process. Run "
             "`python -m pip install -e \".[dev]\"` before running the E2E test."
         )
-
-    bash_exe = _find_git_bash()
-    if bash_exe is None:
-        pytest.skip("bash not found on PATH")
 
     out_root = _make_test_output_root(project_root, tmp_path_factory)
 
@@ -286,6 +259,7 @@ def test_runner_dry_run_succeeds(
     project_root: Path,
     example_xlsx_path: Path,
     tmp_path: Path,
+    bash_exe: str,
 ) -> None:
     """The runner should parse arguments and print commands in dry run mode."""
     runner = project_root / "run_pipeline.sh"
@@ -296,10 +270,6 @@ def test_runner_dry_run_succeeds(
             f"{example_xlsx_path} not present. Run "
             "`python examples/make_example_data.py` to regenerate it."
         )
-
-    bash_exe = _find_git_bash()
-    if bash_exe is None:
-        pytest.skip("bash not found")
 
     env = os.environ.copy()
     env["PYTHON_BIN"] = sys.executable

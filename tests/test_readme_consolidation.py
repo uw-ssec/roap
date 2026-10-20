@@ -5,7 +5,7 @@ from pathlib import Path
 def test_single_readme_at_root():
     readme = Path("README.md")
     assert readme.exists(), "README.md must exist at repo root"
-    content = readme.read_text()
+    content = readme.read_text(encoding="utf-8")
 
     # Three paths documented
     assert "CLI" in content or "command line" in content.lower()
@@ -38,6 +38,6 @@ def test_no_loose_scripts_at_root():
 
 
 def test_readme_documents_git_bash_on_windows():
-    content = Path("README.md").read_text()
+    content = Path("README.md").read_text(encoding="utf-8")
     assert "git bash" in content.lower(), "README must document Git Bash requirement on Windows"
     assert "windows" in content.lower(), "README must mention Windows explicitly"

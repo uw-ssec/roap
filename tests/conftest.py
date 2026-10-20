@@ -9,6 +9,8 @@ small synthetic dataframes used by unit and integration tests.
 
 from __future__ import annotations
 
+import os
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -27,6 +29,31 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 def project_root() -> Path:
     """Project root, the directory containing pyproject.toml."""
     return PROJECT_ROOT
+
+
+@pytest.fixture(scope="session")
+def bash_exe() -> str:
+    """Bash for running run_pipeline.sh, preferring Git Bash on Windows.
+
+    On Windows, a bare ``bash`` resolves to C:\\Windows\\System32\\bash.exe,
+    the WSL launcher, which fails on runners with no distribution installed
+    and mangles Windows paths where one exists. Windows therefore requires
+    Git Bash; other platforms use bash from PATH.
+    """
+    candidates = [
+        Path(os.environ.get("ProgramFiles", "")) / "Git" / "bin" / "bash.exe",
+        Path(os.environ.get("ProgramFiles", "")) / "Git" / "usr" / "bin" / "bash.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "bin" / "bash.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "")) / "Git" / "usr" / "bin" / "bash.exe",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    found = None if os.name == "nt" else shutil.which("bash")
+    if found is None:
+        pytest.skip("bash not found (Windows requires Git Bash)")
+    return found
 
 
 @pytest.fixture(scope="session")
