@@ -90,7 +90,7 @@ def verify_bundle(
         raise typer.Exit(code=1)
 
     try:
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         typer.echo(f"Error parsing manifest: {e}", err=True)
         raise typer.Exit(code=1)
