@@ -30,18 +30,21 @@ You do not need to understand the code. You need these four present and working.
 ## Step 1 — Install Python 3.11
 
 1. Go to https://www.python.org/downloads/windows/
-2. Download the **Windows installer (64-bit)** for the latest **3.11.x** release.
-   (Use 3.11 specifically — the project is built and tested against it.)
-3. Run the installer. **IMPORTANT:** on the first screen, tick
-   **"Add python.exe to PATH"** (a checkbox at the bottom). This matters — if you
-   miss it, later steps fail.
+2. Download the **Windows installer (64-bit)** for the latest **3.11.x**
+   release. (Use 3.11 specifically — the project is built and tested against
+   it.)
+3. Run the installer. **IMPORTANT:** on the first screen, tick **"Add python.exe
+   to PATH"** (a checkbox at the bottom). This matters — if you miss it, later
+   steps fail.
 4. Click **Install Now** and let it finish.
 
-**Check:** open a new PowerShell window (press Start, type *PowerShell*, Enter)
+**Check:** open a new PowerShell window (press Start, type _PowerShell_, Enter)
 and run:
+
 ```
 python --version
 ```
+
 You should see `Python 3.11.x`. If you see an error or a different version, the
 PATH box was probably missed — re-run the installer and tick it.
 
@@ -55,9 +58,11 @@ PATH box was probably missed — re-run the installer and tick it.
 3. Finish.
 
 **Check:** in PowerShell, run:
+
 ```
 git --version
 ```
+
 You should see a version number. This also means **Git Bash** is now installed —
 the pipeline needs it, and it is now present.
 
@@ -67,12 +72,15 @@ the pipeline needs it, and it is now present.
 
 1. Choose a folder for your projects, e.g. `C:\Users\<you>\Projects`. In
    PowerShell:
+
 ```
 cd $HOME
 mkdir Projects
 cd Projects
 ```
+
 2. Download (clone) the repository:
+
 ```
 git clone https://github.com/reez-png/oa_pipeline.git
 cd oa_pipeline
@@ -101,14 +109,17 @@ Jupyter, and the pipeline itself). It can take several minutes.
 
 > If `Activate.ps1` gives a "running scripts is disabled" error, run this once,
 > then retry the activate line:
+>
 > ```
 > Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 > ```
 
 **Check:** with the environment active (your prompt shows `(.venv)`), run:
+
 ```
 python -c "import oa_pipeline, PyCO2SYS, pandas; print('install OK')"
 ```
+
 You should see `install OK`.
 
 ---
@@ -119,21 +130,21 @@ You should see `install OK`.
 python -m oa_pipeline.alka.app
 ```
 
-The **Alka** window should open, and the log area should say
-*"Environment looks good."*
+The **Alka** window should open, and the log area should say _"Environment looks
+good."_
 
-**Check:** you see the Alka window with Data / Options sections and a
-*Run pipeline* button. If it says there is an environment problem (e.g. "bash
-not found"), see Troubleshooting below.
+**Check:** you see the Alka window with Data / Options sections and a _Run
+pipeline_ button. If it says there is an environment problem (e.g. "bash not
+found"), see Troubleshooting below.
 
 ---
 
 ## Step 6 — Run it once on the example data
 
-1. In Alka, click **Browse…** next to *Input workbook* and choose a workbook to
+1. In Alka, click **Browse…** next to _Input workbook_ and choose a workbook to
    process (e.g. your cruise file, or a provided example).
-2. Click **Browse…** next to *Output folder* and choose where results go
-   (e.g. make a folder called `output`).
+2. Click **Browse…** next to _Output folder_ and choose where results go (e.g.
+   make a folder called `output`).
 3. Leave **Compute carbonate chemistry internally** ticked.
 4. Click **Run pipeline.**
 
@@ -148,6 +159,7 @@ You are now set up. From here, see **ALKA_README.md** for day-to-day use.
 ## Getting updates later
 
 When the project is updated, get the latest version with:
+
 ```
 cd $HOME\Projects\oa_pipeline
 git pull
@@ -160,7 +172,7 @@ python -m pip install -r requirements.txt
 ## Troubleshooting
 
 - **`python` not recognised** — Python's PATH box was missed in Step 1. Re-run
-  the Python installer and tick *"Add python.exe to PATH"*.
+  the Python installer and tick _"Add python.exe to PATH"_.
 - **`Activate.ps1` is blocked** — run the `Set-ExecutionPolicy` line in Step 4,
   then retry.
 - **Alka says "bash not found"** — Git (and Git Bash) is not installed or not on
@@ -169,8 +181,8 @@ python -m pip install -r requirements.txt
   `python -m pip install jupyterlab` with the environment active.
 - **The Alka window looks cut off** — it scrolls; use the scrollbar or mouse
   wheel.
-- **Something else** — the log area shows the error text. Copy it when asking for
-  help; it usually names the missing piece.
+- **Something else** — the log area shows the error text. Copy it when asking
+  for help; it usually names the missing piece.
 
 ---
 
@@ -178,8 +190,8 @@ python -m pip install -r requirements.txt
 
 The same four ingredients apply, with platform differences:
 
-- **Python 3.11:** install via python.org, Homebrew (`brew install python@3.11`),
-  or your package manager.
+- **Python 3.11:** install via python.org, Homebrew
+  (`brew install python@3.11`), or your package manager.
 - **Git / bash:** macOS and Linux already have bash; install Git via Homebrew
   (`brew install git`) or your package manager.
 - **Environment:** create and activate with

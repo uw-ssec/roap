@@ -17,8 +17,7 @@ standards.
 `pixi run pipeline examples/example_data.xlsx outputs/test` →
 `<out>/oa_stage4_outputs/data/analysis_ready.csv` with the expected 4 non-PASS
 verdicts (3 FAIL + 1 REVIEW, column `analysis_audit_status`) in <10 min on
-Linux, macOS,
-Windows.
+Linux, macOS, Windows.
 
 ---
 
@@ -102,7 +101,8 @@ validation fails fast; hypothesis tests in CI.
 
 ## Key Decisions (from `decisions.md`)
 
-1. **ADR 0001**: Option C — NetCDF (GOA-ON template, CF conventions). Supersedes the earlier Option B (File Manifest).
+1. **ADR 0001**: Option C — NetCDF (GOA-ON template, CF conventions). Supersedes
+   the earlier Option B (File Manifest).
 2. **PyCO2SYS**: v1 Stable (`opt_k_carbonic=10`, `opt_pH_scale=1`)
 3. **Dataset**: Local path available for manual regression
 4. **GPG Signing**: Deferred to post-v1.0.0 (unsigned tags)
@@ -148,7 +148,8 @@ validation fails fast; hypothesis tests in CI.
 ## Out of Scope (Non-Goals)
 
 - Reimplement PyCO2SYS chemistry (wrap, don't rewrite)
-- Queryable time-series database in v1.0 (ADR 0001 resolved as Option C: NetCDF export, not a database)
+- Queryable time-series database in v1.0 (ADR 0001 resolved as Option C: NetCDF
+  export, not a database)
 - Web-based UI (Tkinter GUI meets Kofi's need)
 - Real-time/streaming processing (batch <100 bottles)
 - Multi-tenant SaaS (regional network deployment model)

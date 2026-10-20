@@ -36,11 +36,11 @@ The system is fully defined by **any 2 of these 4**, plus salinity, temperature,
 pressure, and optionally nutrients:
 
 | Parameter   | Meaning                                         | Typical method                 |
-| ----------- | ----------------------------------------------- | ------------------------------- |
-| DIC         | Dissolved Inorganic Carbon: CO2 + HCO3- + CO3-- | Coulometry / infrared            |
-| TA          | Total Alkalinity: acid-buffering capacity       | Titration                        |
-| pH          | Hydrogen ion activity                           | Spectrophotometry / electrodes   |
-| pCO2 / fCO2 | Partial / fugacity of CO2                       | Equilibration + IR/GC             |
+| ----------- | ----------------------------------------------- | ------------------------------ |
+| DIC         | Dissolved Inorganic Carbon: CO2 + HCO3- + CO3-- | Coulometry / infrared          |
+| TA          | Total Alkalinity: acid-buffering capacity       | Titration                      |
+| pH          | Hydrogen ion activity                           | Spectrophotometry / electrodes |
+| pCO2 / fCO2 | Partial / fugacity of CO2                       | Equilibration + IR/GC          |
 
 **DIC + TA** is the standard pairing for this project — both are stable to
 measure, ship, and store, unlike pH, which drifts without careful handling.

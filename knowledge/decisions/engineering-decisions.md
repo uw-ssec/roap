@@ -135,9 +135,8 @@ Gate**: `pixi run pre-commit-all` (ruff, black, mypy, pytest) **Decider**: Lead
 ## 7. Architecture: Single Engine, Three Doors
 
 **Decision**: Core logic in `src/roap/`; CLI (`run_pipeline.sh`), GUI
-(`tools/roap_app.py`), Notebooks (`notebooks/`) all call same core.
-**Decider**: Council review / ADR-0010 ✅ **Implemented in**: P-1 migration
-(Week 1-2)
+(`tools/roap_app.py`), Notebooks (`notebooks/`) all call same core. **Decider**:
+Council review / ADR-0010 ✅ **Implemented in**: P-1 migration (Week 1-2)
 
 ---
 
@@ -157,6 +156,7 @@ stage → assert untargeted columns byte-identical. **Decider**: Council review 
 **Implemented in**: P0 (Week 3-4), `tests/test_invariants.py`
 
 ---
+
 ## 10. Config Compatibility Gate (P1.2)
 
 **Decision**: `compatible_pipeline_version` in config YAML enforced at runtime —
@@ -236,6 +236,7 @@ must use the production package name. Automated via find/replace. **Decider**:
 Lead ✅ **Implemented in**: P-1 migration (Week 1-2).
 
 ---
+
 ## Related Documents
 
 - [Council Review of Epic Plan](council-review.md)
@@ -251,19 +252,27 @@ Lead ✅ **Implemented in**: P-1 migration (Week 1-2).
 
 ### Context
 
-During P-1 through P1 milestones, four PRs were squash-merged into main, collapsing 78 individual commits into a single mega-commit. This lost bisectability, blame accuracy, and reviewability.
+During P-1 through P1 milestones, four PRs were squash-merged into main,
+collapsing 78 individual commits into a single mega-commit. This lost
+bisectability, blame accuracy, and reviewability.
 
 ### Options Considered
 
-| Option                              | Description                                                        | Pros                                                            | Cons                                                |
-| ----------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------- |
-| **Keep squash merge**               | Leave history as single mega-commit                                | Simple; matches GitHub default                                  | Loses bisectability, blame accuracy, reviewability |
-| **Force-push rewritten history**    | Rebuild main with individual commits via cherry-pick/merge         | Restores bisectability, blame, reviewability; full transparency | Requires force-push; team must re-clone/rebase     |
-| **Leave as-is, document refs**      | Keep mega-commit, document feature branch refs in docs             | Zero disruption; history preserved in feature branches          | Bisect/blame still broken on main                  |
+| Option                           | Description                                                | Pros                                                            | Cons                                               |
+| -------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------- |
+| **Keep squash merge**            | Leave history as single mega-commit                        | Simple; matches GitHub default                                  | Loses bisectability, blame accuracy, reviewability |
+| **Force-push rewritten history** | Rebuild main with individual commits via cherry-pick/merge | Restores bisectability, blame, reviewability; full transparency | Requires force-push; team must re-clone/rebase     |
+| **Leave as-is, document refs**   | Keep mega-commit, document feature branch refs in docs     | Zero disruption; history preserved in feature branches          | Bisect/blame still broken on main                  |
 
 ### Decision
 
-**Selected: Force-push rewritten history** **Rationale**: Restoring individual commits restores `git bisect`, `git blame`, and per-commit reviewability. Feature branches (`feat/p1-migration`, `feat/p0-ci-invariant-readme`, `feat/p1-release-config-bundles`) preserved as permanent reference. Backup branch (`backup-main`) created for rollback. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `git push --force-with-lease` from rebuilt `main-rebuilt` branch. **Rollback**: `git push origin backup-main:main --force` if needed.
+**Selected: Force-push rewritten history** **Rationale**: Restoring individual
+commits restores `git bisect`, `git blame`, and per-commit reviewability.
+Feature branches (`feat/p1-migration`, `feat/p0-ci-invariant-readme`,
+`feat/p1-release-config-bundles`) preserved as permanent reference. Backup
+branch (`backup-main`) created for rollback. **Decider**: Lead ✅ **Implemented
+in**: 2026-10-18, `git push --force-with-lease` from rebuilt `main-rebuilt`
+branch. **Rollback**: `git push origin backup-main:main --force` if needed.
 
 ---
 
@@ -271,11 +280,14 @@ During P-1 through P1 milestones, four PRs were squash-merged into main, collaps
 
 ### Context
 
-The CI workflow used `prefix-dev/setup-pixi@v2` which doesn't exist (the action doesn't have a `v2` tag).
+The CI workflow used `prefix-dev/setup-pixi@v2` which doesn't exist (the action
+doesn't have a `v2` tag).
 
 ### Decision
 
-**Selected: Pin to `v0.11.2`** **Rationale**: Explicit version pin avoids "tag not found" failures. Latest stable at time of fix was `v0.11.2`. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `.github/workflows/ci.yml` line 23.
+**Selected: Pin to `v0.11.2`** **Rationale**: Explicit version pin avoids "tag
+not found" failures. Latest stable at time of fix was `v0.11.2`. **Decider**:
+Lead ✅ **Implemented in**: 2026-10-18, `.github/workflows/ci.yml` line 23.
 
 ---
 
@@ -283,11 +295,15 @@ The CI workflow used `prefix-dev/setup-pixi@v2` which doesn't exist (the action 
 
 ### Context
 
-CI failures on macOS/Ubuntu due to pre-commit exceeding 30-min timeout and no caching.
+CI failures on macOS/Ubuntu due to pre-commit exceeding 30-min timeout and no
+caching.
 
 ### Decision
 
-**Selected: Add `actions/cache@v4` for `~/.cache/pre-commit` + 10-min timeout on pre-commit step** **Rationale**: Caches hooks across runs; timeout prevents stuck jobs. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `.github/workflows/ci.yml`.
+**Selected: Add `actions/cache@v4` for `~/.cache/pre-commit` + 10-min timeout on
+pre-commit step** **Rationale**: Caches hooks across runs; timeout prevents
+stuck jobs. **Decider**: Lead ✅ **Implemented in**: 2026-10-18,
+`.github/workflows/ci.yml`.
 
 ---
 
@@ -299,7 +315,12 @@ Pipeline was dropping CRM/TRIS rows in Stage 1B, losing audit trail.
 
 ### Decision
 
-**Selected: Preserve all rows in `analysis_ready_subset()`; add `row_classification` column (`SAMPLE`/`CRM_QC`/`STD_QC`)** **Rationale**: CRM/TRIS rows are QC reference material; must appear in final output with appropriate verdicts (`CRM_QC`/`STD_QC`). **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/stage1b.py` (`classify_rows_sample`, `analysis_ready_subset`), test `tests/test_crm_tris_preservation.py`.
+**Selected: Preserve all rows in `analysis_ready_subset()`; add
+`row_classification` column (`SAMPLE`/`CRM_QC`/`STD_QC`)** **Rationale**:
+CRM/TRIS rows are QC reference material; must appear in final output with
+appropriate verdicts (`CRM_QC`/`STD_QC`). **Decider**: Lead ✅ **Implemented
+in**: 2026-10-11, `src/roap/stage1b.py` (`classify_rows_sample`,
+`analysis_ready_subset`), test `tests/test_crm_tris_preservation.py`.
 
 ---
 
@@ -307,11 +328,17 @@ Pipeline was dropping CRM/TRIS rows in Stage 1B, losing audit trail.
 
 ### Context
 
-`build_corrections_table()` returned `None` when `group_by` not in columns, causing `AttributeError` in CRM correction during invariant tests (which run without `--config-dir`).
+`build_corrections_table()` returned `None` when `group_by` not in columns,
+causing `AttributeError` in CRM correction during invariant tests (which run
+without `--config-dir`).
 
 ### Decision
 
-**Selected: Ensure `build_corrections_table()` always returns DataFrame with fallback for non-grouped case** **Rationale**: Invariant tests run without config; pipeline must not crash. Fallback returns overall stats. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `src/roap/common.py:983-991` (fallback `return pd.DataFrame(...)`).
+**Selected: Ensure `build_corrections_table()` always returns DataFrame with
+fallback for non-grouped case** **Rationale**: Invariant tests run without
+config; pipeline must not crash. Fallback returns overall stats. **Decider**:
+Lead ✅ **Implemented in**: 2026-10-18, `src/roap/common.py:983-991` (fallback
+`return pd.DataFrame(...)`).
 
 ---
 
@@ -323,7 +350,11 @@ Need immutable run records for reproducibility (P1.3).
 
 ### Decision
 
-**Selected: `src/roap/bundle.py` with `generate_run_bundle_manifest()` + `verify_bundle()`; CLI `roap verify-bundle <run_dir> [--json]`** **Rationale**: SHA256 hashes of input/config/output files; git commit + pipeline version; JSON output for automation. **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/bundle.py`, `src/roap/cli.py`, `run_pipeline.sh` env export.
+**Selected: `src/roap/bundle.py` with `generate_run_bundle_manifest()` +
+`verify_bundle()`; CLI `roap verify-bundle <run_dir> [--json]`** **Rationale**:
+SHA256 hashes of input/config/output files; git commit + pipeline version; JSON
+output for automation. **Decider**: Lead ✅ **Implemented in**: 2026-10-11,
+`src/roap/bundle.py`, `src/roap/cli.py`, `run_pipeline.sh` env export.
 
 ---
 
@@ -335,7 +366,11 @@ Stale configs could silently produce wrong results.
 
 ### Decision
 
-**Selected: Runtime gate in `load_config()` calling `check_config_compatibility()` with `compatible_pipeline_version` key in all 7 config YAMLs** **Rationale**: Fail fast with actionable error instead of silent drift. **Decider**: Lead ✅ **Implemented in**: 2026-10-11, `src/roap/common.py:594`, `tests/test_config_gate.py`.
+**Selected: Runtime gate in `load_config()` calling
+`check_config_compatibility()` with `compatible_pipeline_version` key in all 7
+config YAMLs** **Rationale**: Fail fast with actionable error instead of silent
+drift. **Decider**: Lead ✅ **Implemented in**: 2026-10-11,
+`src/roap/common.py:594`, `tests/test_config_gate.py`.
 
 ---
 
@@ -343,11 +378,15 @@ Stale configs could silently produce wrong results.
 
 ### Context
 
-After CRM/TRIS preservation (Issue #29), pipeline output has 27 rows (20 samples + 4 CRM + 3 TRIS) instead of 20.
+After CRM/TRIS preservation (Issue #29), pipeline output has 27 rows (20
+samples + 4 CRM + 3 TRIS) instead of 20.
 
 ### Decision
 
-**Selected: Update `EXPECTED_NON_PASS` in `tests/test_cli_pipeline.py` to include CRM_QC (4) + STD_QC (3) rows** **Rationale**: Test must match actual pipeline behavior post-fix. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `tests/test_cli_pipeline.py`.
+**Selected: Update `EXPECTED_NON_PASS` in `tests/test_cli_pipeline.py` to
+include CRM_QC (4) + STD_QC (3) rows** **Rationale**: Test must match actual
+pipeline behavior post-fix. **Decider**: Lead ✅ **Implemented in**: 2026-10-18,
+`tests/test_cli_pipeline.py`.
 
 ---
 
@@ -355,11 +394,17 @@ After CRM/TRIS preservation (Issue #29), pipeline output has 27 rows (20 samples
 
 ### Context
 
-`detect-secrets` flagged test fixture `git_commit="abc123def456"` as high-entropy string; `codespell` flagged domain abbreviations (`pres`→`press`, `pressent`→`present`).
+`detect-secrets` flagged a hex-like `git_commit` test fixture as a high-entropy
+string; `codespell` flagged the short pressure variable name and a misspelling
+of "present".
 
 ### Decision
 
-**Selected: Rename test fixture to `test-commit-abc123`; fix typos in `carbonate_calc.py`** **Rationale**: Avoid silencing security hooks; fix actual typos instead of allowlisting. **Decider**: Lead ✅ **Implemented in**: 2026-10-18, `tests/test_run_bundle.py`, `tests/test_verify_bundle_cli.py`, `src/roap/carbonate_calc.py`.
+**Selected: Rename test fixture to `test-commit-abc123`; fix typos in
+`carbonate_calc.py`** **Rationale**: Avoid silencing security hooks; fix actual
+typos instead of allowlisting. **Decider**: Lead ✅ **Implemented in**:
+2026-10-18, `tests/test_run_bundle.py`, `tests/test_verify_bundle_cli.py`,
+`src/roap/carbonate_calc.py`.
 
 ---
 

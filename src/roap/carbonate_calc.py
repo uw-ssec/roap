@@ -59,7 +59,7 @@ CARBONATE_CALC_DEFAULTS: Dict[str, Any] = {
         "hco3": "hco3_calc_umol_kg",
         "co3": "co3_calc_umol_kg",
         "revelle": "revelle_factor_calc",
-        "ph_insitu": "ph_co2sys",  # calculated pH re-expresssed at in-situ T
+        "ph_insitu": "ph_co2sys",  # calculated pH re-expressed at in-situ T
     },
     # Only compute where TA was actually correction-resolved. If True, rows
     # whose TA correction was withheld/failed still get computed (from whatever
@@ -241,7 +241,7 @@ def compute(df: pd.DataFrame, settings: Optional[Dict[str, Any]] = None
     out.loc[idx, o["hco3"]] = res["HCO3_out"]
     out.loc[idx, o["co3"]] = res["CO3_out"]
     out.loc[idx, o["revelle"]] = res["revelle_factor_out"]
-    # calculated pH re-expresssed at in-situ temperature (for the QC cross-check)
+    # calculated pH re-expressed at in-situ temperature (for the QC cross-check)
     out.loc[idx, o["ph_insitu"]] = res["pH_out"]
 
     # ---- provenance stamps (constant across sample rows) ----

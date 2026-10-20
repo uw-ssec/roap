@@ -173,6 +173,4 @@ batches:
       bottling_date: "2025-09-05",
     }
 
-
-compatible_pipeline_version: '>=0.2.0'
-
+compatible_pipeline_version: ">=0.2.0"
