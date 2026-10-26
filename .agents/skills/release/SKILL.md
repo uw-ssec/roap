@@ -100,6 +100,10 @@ None. The version is derived from today's date.
       plugin_name_MM_DD_YYYY.zip
     ```
 
+    Publishing the release triggers `.github/workflows/publish.yml`, which
+    uploads the package to PyPI. That job fails unless the tag equals `v` + the
+    `pyproject.toml` version.
+
 12. Clean up zip files from the repo root after successful upload.
 
 13. Confirm: "Released vYYYY.0M.MICRO — <release URL>"

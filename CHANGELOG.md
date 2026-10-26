@@ -6,6 +6,12 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ## [Unreleased]
 
+### Added
+
+- Automated publishing: every merge to `main` uploads a CalVer dev build
+  (`YYYY.0M.MICRO.devN`) to TestPyPI, and a published GitHub Release uploads the
+  release to PyPI (trusted publishing, no stored tokens)
+
 ### Changed
 
 - Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`; the first CalVer
