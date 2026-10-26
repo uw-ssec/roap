@@ -2,9 +2,9 @@
 
 import io
 import math
-import re
 import subprocess
 import tempfile
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import pandas as pd
@@ -95,8 +95,61 @@ STAGE_INPUT = {
     "08_stage4": "oa_stage3_outputs/data/enhanced.csv",
 }
 
+# Untouched columns whose text a stage may re-serialise without changing the
+# value. Every other column must come through as exactly the same text, so an
+# identifier such as "00123" or "2024-03-01" is never compared numerically or
+# as a date. Each entry was measured from a real run of the example workbook.
+#   "float":    re-parsed and re-written float; last digits may move
+#   "count":    whole number written as "1" or "1.0"; value must be identical
+#   "datetime": same instant written in another format, naive read as UTC
+#               (matches common.coerce_datetime)
+_FLOAT = "float"
+_COUNT = "count"
+_DATETIME = "datetime"
+SERIALISATION_EQUIVALENT = {
+    "04_stage1a": {
+        "sample_date": _DATETIME,
+        "ta_corr_se": _FLOAT,
+        "phstd_diff": _FLOAT,
+        "phstd_correction_raw": _FLOAT,
+        "phstd_corr_value": _FLOAT,
+        "phstd_corr_sd": _FLOAT,
+        "phstd_corr_se": _FLOAT,
+        "phstd_correction_used": _FLOAT,
+    },
+    "07_stage3": {
+        "duplicate_group_size": _COUNT,
+        "replicate_group_n": _COUNT,
+        "n_reps": _COUNT,
+    },
+    "08_stage4": {
+        "dic_sum_species": _FLOAT,
+        "dic_minus_species_sum": _FLOAT,
+        "dic_species_rel_diff": _FLOAT,
+        "dic_tol_used": _FLOAT,
+        "ph_best_minus_ph_co2sys_temp_harmonized": _FLOAT,
+        "ph_best_minus_ph_co2sys": _FLOAT,
+        **{
+            col: _COUNT
+            for col in (
+                "n_rows", "n_dic_values_present", "n_dic_checkable",
+                "n_dic_unit_missing", "n_dic_unit_mismatch",
+                "n_dic_inconsistent", "n_dic_inconsistent_robust",
+                "n_dic_nonpositive", "n_any_negative_species",
+                "n_ph_values_present", "n_ph_checkable",
+                "n_ph_strict_checkable", "n_ph_best_scale_unexpected",
+                "n_ph_co2sys_scale_unexpected", "n_ph_scale_mismatch",
+                "n_ph_diag_mismatch", "n_ph_diag_mismatch_strict",
+                "n_ph_diag_mismatch_robust",
+                "n_stage2_replicate_conflict_carried", "n_solver_unknown",
+                "n_carbon_input_pair_unknown", "n_any_carbonate_issue",
+                "n_any_carbonate_issue_strict", "n_any_stage3_review_issue",
+            )
+        },
+    },
+}
+
 EXAMPLE_XLSX = Path("examples/example_data.xlsx")
-_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Re-parsing a float and writing it back can move its last digits.
 FLOAT_RTOL = 1e-12
 
@@ -111,42 +164,58 @@ def _workbook_as_text(path: Path) -> pd.DataFrame:
     return _read_as_text(io.StringIO(df.to_csv(index=False)))
 
 
-def _same_value(a: str, b: str) -> bool:
+def _same_value(a: str, b: str, kind: str | None = None) -> bool:
     """True if two CSV cells hold the same value.
 
-    Only serialisation differences are allowed: a float written with different
-    precision ("1" vs "1.0", last-digit rounding), and a date written in a
-    different format for the same instant ("2024-03-01" vs
-    "2024-03-01T00:00:00Z"). Case, spelling and any real change in value or
-    time are mutations.
+    With no kind the text must match exactly. A kind from
+    SERIALISATION_EQUIVALENT also accepts the same value written differently;
+    any real change in value or time is still a mutation.
     """
     if a == b:
         return True
-    try:
-        fa, fb = float(a), float(b)
-    except ValueError:
-        pass
-    else:
+    if kind is None:
+        return False
+    if kind == _COUNT:
+        try:
+            return Decimal(a) == Decimal(b)
+        except InvalidOperation:
+            return False
+    if kind == _FLOAT:
+        try:
+            fa, fb = float(a), float(b)
+        except ValueError:
+            return False
         if math.isnan(fa) or math.isnan(fb):
             return math.isnan(fa) and math.isnan(fb)
         return math.isclose(fa, fb, rel_tol=FLOAT_RTOL, abs_tol=0.0)
-    if _ISO_DATE.match(a) and _ISO_DATE.match(b):
+    if kind == _DATETIME:
         try:
             ta = pd.Timestamp(a)
             tb = pd.Timestamp(b)
         except ValueError:
             return False
+        if pd.isna(ta) or pd.isna(tb):
+            return False
         ta = ta.tz_localize("UTC") if ta.tzinfo is None else ta.tz_convert("UTC")
         tb = tb.tz_localize("UTC") if tb.tzinfo is None else tb.tz_convert("UTC")
         return ta == tb
-    return False
+    raise ValueError(f"unknown serialisation kind {kind!r}")
 
 
-def assert_untouched_unchanged(input_df: pd.DataFrame, output_df: pd.DataFrame, target_cols: set, stage_name: str):
+def assert_untouched_unchanged(
+    input_df: pd.DataFrame,
+    output_df: pd.DataFrame,
+    target_cols: set,
+    stage_name: str,
+    equivalent: dict | None = None,
+):
     """Assert columns NOT in target_cols keep every value from input to output.
 
-    Both frames must be read as text (see _read_as_text).
+    Both frames must be read as text (see _read_as_text). ``equivalent`` maps
+    the untouched columns that may be re-serialised to their kind; every other
+    column must keep exactly the same text.
     """
+    equivalent = equivalent or {}
     dropped = set(input_df.columns) - set(output_df.columns)
     assert not dropped, f"{stage_name}: Columns dropped: {dropped}"
     assert len(input_df) == len(output_df), (
@@ -156,8 +225,9 @@ def assert_untouched_unchanged(input_df: pd.DataFrame, output_df: pd.DataFrame, 
     for col in input_df.columns:
         if col in target_cols:
             continue
+        kind = equivalent.get(col)
         for row, (a, b) in enumerate(zip(input_df[col], output_df[col])):
-            assert _same_value(a, b), (
+            assert _same_value(a, b, kind), (
                 f"{stage_name}: Column '{col}' mutated at row {row}: {a!r} -> {b!r}"
             )
 
@@ -192,7 +262,10 @@ def test_stage_invariant_columns(stage_name, pipeline_run):
         input_df = _read_as_text(_one_file(pipeline_run, STAGE_INPUT[stage_name]))
     output_df = _read_as_text(_one_file(pipeline_run, STAGE_OUTPUT[stage_name]))
 
-    assert_untouched_unchanged(input_df, output_df, STAGE_TARGETS[stage_name], stage_name)
+    assert_untouched_unchanged(
+        input_df, output_df, STAGE_TARGETS[stage_name], stage_name,
+        SERIALISATION_EQUIVALENT.get(stage_name),
+    )
 
 
 @pytest.mark.parametrize(
@@ -200,14 +273,17 @@ def test_stage_invariant_columns(stage_name, pipeline_run):
     [
         ("SAMPLE_A", "sample_a"),  # identifier case
         ("quartz", "quart"),  # trailing character
+        ("00123", "123"),  # numeric-looking ID loses leading zeros
+        ("9007199254740992", "9007199254740993"),  # beyond float precision
+        ("1", "1.0"),  # numeric-looking ID reformatted
+        ("2024-03-01", "2024-03-01T00:00:00Z"),  # date-looking ID reformatted
         ("2024-03-01T00:00:00", "2024-03-01T23:59:59"),  # time of day
-        ("2024-03-01", "2024-03-02T00:00:00Z"),  # date
         ("2050.1", "2050.2"),  # numeric value
         ("1", ""),  # value cleared
     ],
 )
 def test_checker_catches_mutation(before, after):
-    """The comparison must fail on a real change in a non-target column."""
+    """With no declared kind, any change of text in a non-target column fails."""
     input_df = pd.DataFrame({"record_id": ["x", before]})
     output_df = pd.DataFrame({"record_id": ["x", after]})
     with pytest.raises(AssertionError, match="record_id"):
@@ -215,19 +291,53 @@ def test_checker_catches_mutation(before, after):
 
 
 @pytest.mark.parametrize(
-    "before, after",
+    "kind, before, after",
     [
-        ("1", "1.0"),
-        ("0.013999999999999346", "0.0139999999999993"),
-        ("2024-03-01", "2024-03-01T00:00:00Z"),
-        ("", ""),
+        (_COUNT, "9007199254740992", "9007199254740993"),
+        (_COUNT, "00123", "124"),
+        (_COUNT, "1", "1.5"),
+        (_COUNT, "1", ""),
+        (_FLOAT, "2050.1", "2050.2"),
+        (_FLOAT, "0.5", "abc"),
+        (_FLOAT, "1", ""),
+        (_DATETIME, "2024-03-01T00:00:00", "2024-03-01T23:59:59"),
+        (_DATETIME, "2024-03-01", "2024-03-02T00:00:00Z"),
+        (_DATETIME, "2024-03-01", ""),
     ],
 )
-def test_checker_allows_serialisation_only(before, after):
-    """Re-serialising the same value is not a mutation."""
+def test_checker_catches_mutation_in_declared_column(kind, before, after):
+    """A declared kind tolerates re-serialisation, never a changed value."""
     input_df = pd.DataFrame({"c": [before]})
     output_df = pd.DataFrame({"c": [after]})
-    assert_untouched_unchanged(input_df, output_df, set(), "synthetic")
+    with pytest.raises(AssertionError, match="'c'"):
+        assert_untouched_unchanged(input_df, output_df, set(), "synthetic", {"c": kind})
+
+
+@pytest.mark.parametrize(
+    "kind, before, after",
+    [
+        (_COUNT, "1", "1.0"),
+        (_COUNT, "0", "0.0"),
+        (_FLOAT, "1", "1.0"),
+        (_FLOAT, "0.013999999999999346", "0.0139999999999993"),
+        (_DATETIME, "2024-03-01", "2024-03-01T00:00:00Z"),
+        (None, "", ""),
+    ],
+)
+def test_checker_allows_serialisation_only(kind, before, after):
+    """Re-serialising the same value in a declared column is not a mutation."""
+    input_df = pd.DataFrame({"c": [before]})
+    output_df = pd.DataFrame({"c": [after]})
+    assert_untouched_unchanged(input_df, output_df, set(), "synthetic", {"c": kind})
+
+
+def test_serialisation_equivalent_is_scoped():
+    """Equivalence entries name real stages and only untouched columns."""
+    kinds = {_FLOAT, _COUNT, _DATETIME}
+    for stage, columns in SERIALISATION_EQUIVALENT.items():
+        assert stage in STAGE_TARGETS, stage
+        assert not set(columns) & STAGE_TARGETS[stage], stage
+        assert set(columns.values()) <= kinds, stage
 
 
 def test_checker_catches_dropped_column_and_rows():
