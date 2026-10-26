@@ -49,11 +49,11 @@ analyzing changes.
 
    ```bash
    git add CHANGELOG.md
-   git commit -m "chore(release): prepare vX.Y.Z" -m "Co-Authored-By: <tool name>"
+   git commit -m "chore(release): prepare vX.Y.Z" -m "Assisted-by: <harness>:<model>"
    ```
 
-   The trailer carries no `<email>` component — see the `commit` skill for the
-   format. Omit it entirely if the release was cut without AI assistance.
+   See the `commit` skill for the trailer format. Omit it entirely if the
+   release was cut without AI assistance.
 
 8. Create the git tag:
 
