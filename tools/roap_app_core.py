@@ -149,6 +149,16 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _signal_tree(pgid: int, pids: list[int], sig: int) -> None:
     try:
         os.killpg(pgid, sig)
@@ -164,7 +174,14 @@ def _signal_tree(pgid: int, pids: list[int], sig: int) -> None:
 def _escalate(proc: subprocess.Popen, pids: list[int], grace: float) -> None:
     deadline = time.monotonic() + grace
     while time.monotonic() < deadline:
-        if proc.poll() is not None and not any(_pid_alive(p) for p in pids):
+        # The group check catches members born after the descendant snapshot,
+        # e.g. started by a SIGTERM handler; the PID list catches the ones that
+        # left the group (Jupyter kernels).
+        if (
+            proc.poll() is not None
+            and not _group_alive(proc.pid)
+            and not any(_pid_alive(p) for p in pids)
+        ):
             return
         time.sleep(0.1)
     _signal_tree(proc.pid, [p for p in pids if _pid_alive(p)], signal.SIGKILL)

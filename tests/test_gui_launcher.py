@@ -333,3 +333,54 @@ def test_gui_quit_mid_run_confirms_then_stops_whole_tree(
     )
     assert "RUNNING_AFTER_DECLINE True" in result.stdout, result.stdout
     _assert_no_survivors(result.stdout)
+
+
+# The leader's SIGTERM handler starts a group member that ignores SIGTERM, then
+# exits. That member is born after the descendant snapshot, so only checking
+# the process group itself keeps the escalation from returning early.
+LATE_MEMBER_PIPELINE = r"""
+import os, signal, subprocess, sys, time
+def on_term(*_):
+    late = subprocess.Popen([sys.executable, "-c",
+        "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+        "time.sleep(120)"])
+    with open(sys.argv[1] + ".late", "w") as f:
+        f.write(str(late.pid))
+    os._exit(0)
+signal.signal(signal.SIGTERM, on_term)
+with open(sys.argv[1], "w") as f:
+    f.write("ready")
+time.sleep(120)
+"""
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX process groups")
+def test_stop_process_tree_kills_group_member_born_after_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sys.path.insert(0, str(TOOLS))
+    import roap_app_core as core
+
+    monkeypatch.setattr(core, "STOP_GRACE_SECONDS", TEST_GRACE_SECONDS)
+    pid_file = tmp_path / "pids"
+    late_file = tmp_path / "pids.late"
+    proc = subprocess.Popen(
+        [sys.executable, "-c", LATE_MEMBER_PIPELINE, str(pid_file)],
+        stdout=subprocess.DEVNULL,
+        **core.process_group_kwargs(),
+    )
+    try:
+        deadline = time.monotonic() + 30
+        while not (pid_file.exists() and pid_file.read_text().strip()):
+            assert time.monotonic() < deadline, "leader never started"
+            time.sleep(0.05)
+        escalation = core.stop_process_tree(proc)
+        assert escalation is not None
+        escalation.join(timeout=TEST_GRACE_SECONDS + 10)
+        proc.wait(timeout=10)
+        _assert_no_survivors(f"PIDS {late_file.read_text()}")
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
