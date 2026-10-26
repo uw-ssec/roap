@@ -14,11 +14,11 @@ pixi run pipeline examples/example_data.xlsx outputs/test
 
 Output: `outputs/test/oa_stage4_outputs/data/analysis_ready.csv` with verdicts.
 
-### 2. GUI — No terminal
+### 2. GUI — Desktop launcher
 
 ```bash
 pixi install
-python tools/roap_app.py
+pixi run python tools/roap_app.py
 ```
 
 Click "Run Pipeline", select input, watch progress.
@@ -27,7 +27,7 @@ Click "Run Pipeline", select input, watch progress.
 
 ```bash
 pixi install
-jupyter lab notebooks/
+pixi run jupyter lab notebooks/
 ```
 
 Run `01_preview.ipynb` → `08_stage4.ipynb` in order.
@@ -91,7 +91,7 @@ Running on `examples/example_data.xlsx` produces **4 non-PASS** verdicts in
 | ------------------------------------ | ------------------------------------------------------------ |
 | `ModuleNotFoundError: roap`          | Run `pixi install`                                           |
 | `run_pipeline.sh: command not found` | Use Git Bash on Windows; `chmod +x run_pipeline.sh` on Unix  |
-| GUI won't open                       | Ensure Tkinter installed (bundled with python.org installer) |
+| GUI won't open                       | Run `pixi install`, then `pixi run python tools/roap_app.py` |
 | Carbonate calc fails                 | PyCO2SYS v1 required; `pixi install` pulls it                |
 | Config version mismatch              | Update `compatible_pipeline_version` in config YAML          |
 
@@ -99,5 +99,5 @@ Running on `examples/example_data.xlsx` produces **4 non-PASS** verdicts in
 
 - `pixi run test` — Full test suite (373 tests)
 - `pixi run pre-commit-all` — Quality gate (ruff, black, mypy, pytest)
-- `pytest tests/test_invariants.py -v` — Invariant test only
+- `pixi run pytest tests/test_invariants.py -v` — Invariant test only
 - See `CONTRIBUTING.md` for contribution discipline

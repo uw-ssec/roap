@@ -165,7 +165,8 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not project_root:
         problems.append(
             "Could not find the project root (run_pipeline.sh + notebooks/). "
-            "Place the app in the project folder."
+            "Keep tools/roap_app.py in the repository and launch it from "
+            "the repository root with pixi run python tools/roap_app.py."
         )
         return problems
     if not bash_exe:
@@ -176,13 +177,13 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not package_importable(python_exe):
         problems.append(
             f"roap is not importable by {python_exe}. "
-            'Run: pip install -e ".[dev]"'
+            "From the repository root, run pixi install, then "
+            "pixi run python tools/roap_app.py."
         )
     if not kernel_available(python_exe):
         problems.append(
-            "No Jupyter 'python3' kernel detected. Run: "
-            f"{python_exe} -m pip install ipykernel && "
-            f"{python_exe} -m ipykernel install --user --name python3"
+            "No Jupyter 'python3' kernel detected. From the repository root, "
+            "run pixi install, then pixi run python tools/roap_app.py."
         )
     return problems
 

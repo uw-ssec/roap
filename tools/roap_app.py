@@ -10,18 +10,17 @@ log, and a verdict summary.
 
 How a user runs it
 ------------------
-- Windows:  double-click `roap_app.py`  (or `python roap_app.py`)
-- macOS:    `python3 roap_app.py`
-- Linux:    `python3 roap_app.py`
+From the repository root on Windows (Git Bash), macOS, or Linux:
 
-It must sit in the project root (the folder containing `run_pipeline.sh`,
-`notebooks/`, `src/roap/`). It checks that for you on launch.
+    pixi install
+    pixi run python tools/roap_app.py
 
-No third-party packages are required for the GUI itself: Tkinter ships with
-the standard CPython installer. The pipeline it launches still needs the
-project installed (`pip install -e ".[dev]"`) and a Jupyter kernel — the app
-detects missing pieces and tells the user exactly what to do, rather than
-failing with a traceback.
+Keep this launcher in `tools/`, alongside `roap_app_core.py`. It discovers
+the project root (containing `run_pipeline.sh` and `notebooks/`) on launch.
+
+Pixi supplies Tkinter, the pipeline package, and a Jupyter kernel. The app
+detects missing pieces and tells the user how to restore the environment,
+rather than failing with a traceback.
 """
 
 from __future__ import annotations
@@ -41,8 +40,8 @@ try:
     from tkinter import filedialog, messagebox, ttk
 except Exception as exc:  # pragma: no cover - environment dependent
     sys.stderr.write(
-        "This launcher needs Tkinter, which is part of the standard Python "
-        "installer.\nOn Debian/Ubuntu: sudo apt install python3-tk\n"
+        "This launcher needs Tkinter. From the repository root, run "
+        "pixi install, then pixi run python tools/roap_app.py.\n"
         f"Import error: {exc}\n"
     )
     sys.exit(1)
