@@ -6,6 +6,12 @@
 results** to the original `oa_pipeline` prototype across all pipeline stages
 when run on the synthetic example dataset.
 
+> **Correction (2026-10-26):** A rerun on `main` @ `a5a0ee4` contradicts parts
+> of this report. See [Re-run 2026-10-26](#re-run-2026-10-26) and issue #46. The
+> real dataset runs in both pipelines and gives the expected verdicts. Stage 1b
+> → 4 outputs are **not** identical, on either dataset: one difference is
+> intended (#29) and one is a regression (#47).
+
 ---
 
 ## Test Methodology
@@ -15,7 +21,8 @@ when run on the synthetic example dataset.
 - **Synthetic example data**: `examples/example_data.xlsx` (20 synthetic
   samples, known generator output)
 - **Real dataset**: Not tested due to prototype pipeline failure on real data
-  (missing CRM certified values in config)
+  (missing CRM certified values in config). _Corrected 2026-10-26: both
+  pipelines complete on the real dataset; see the re-run section below._
 
 ### Execution
 
@@ -81,7 +88,10 @@ sample identifiers.
 
 1. **Real dataset failure**: Both pipelines fail on the April 2026 cruise data
    (`oa_data_apr_provenance.xlsx`) due to missing CRM certified values in config
-   — not a migration issue.
+   — not a migration issue. _Corrected 2026-10-26: does not reproduce. Both
+   pipelines complete on it with `--config-dir configs`. The synthetic example
+   data is what exits at Stage 02 (`SystemExit: 2`) with `--config-dir configs`,
+   in both pipelines._
 
 2. **Submodule test xfail**: `test_prototype_submodule_has_no_stored_outputs`
    marked `@pytest.mark.xfail` — pinned submodule carries executed notebook
@@ -98,6 +108,34 @@ sample identifiers.
 | `08_stage4.yaml`            | ✅        | ✅        | Identical |
 | `crm_certified_values.yaml` | ✅        | ✅        | Identical |
 | `schema_aliases.yaml`       | ✅        | ✅        | Identical |
+
+_Corrected 2026-10-26:_ "Identical" means semantically identical, not
+byte-identical. roap's files are reformatted, and roap adds a
+`compatible_pipeline_version` pin to the stage configs. `schema_aliases.yaml`
+exists only in roap, not in the pinned prototype.
+
+---
+
+## Re-run 2026-10-26
+
+Prototype (submodule `3d125b3`) vs roap (`main` @ `a5a0ee4`), both run with
+`run_pipeline.sh` in the same pixi Python 3.11 env on macOS. Tracked in #46.
+
+| Dataset                                        | Prototype verdicts (38 samples) | roap verdicts (38 samples)   |
+| ---------------------------------------------- | ------------------------------- | ---------------------------- |
+| April 2026 cruise (unpublished, shared folder) | 22 PASS / 16 REVIEW / 0 FAIL    | 22 PASS / 16 REVIEW / 0 FAIL |
+
+- Stage 02 and Stage 1a outputs match, apart from provenance columns.
+- Stage 1b → 4 science values on sample rows match (max |diff| = 0).
+- **Intended difference (#29):** roap keeps CRM and STD rows in Stage 1b → 4
+  outputs and adds `row_classification`.
+- **Regression (#47):** `is_sample_row` holds string labels but is read as a
+  boolean, so CRM/STD rows count as samples. On the real dataset, every sample
+  row's `n_rows_with_incomplete_group_key` is +15 and
+  `flag_core_chemistry_missing` is set on the 15 CRM/STD rows. The example
+  dataset shows it too: +7 on sample rows, and the 3 STD rows are flagged. So
+  the "Numeric match" rows for Stages 1b → 4 above do not hold on current
+  `main`.
 
 ---
 
