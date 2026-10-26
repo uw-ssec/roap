@@ -57,15 +57,15 @@ jobs:
         env:
           OA_KEEP_PYTEST_RUNS: "1"
 
-      # The suite above skips the GUI launch test when there is no display.
+      # The suite above skips the GUI tests when there is no display.
       # Here a display is required: Linux gets a virtual one via Xvfb.
-      - name: GUI launch smoke test
+      - name: GUI smoke tests
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             sudo apt-get update -q && sudo apt-get install -y -q xvfb
-            xvfb-run -a pytest -q tests/test_gui_launcher.py -k launches
+            xvfb-run -a pytest -q tests/test_gui_launcher.py
           else
-            pytest -q tests/test_gui_launcher.py -k launches
+            pytest -q tests/test_gui_launcher.py
           fi
         shell: bash
         env:
