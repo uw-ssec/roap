@@ -57,6 +57,20 @@ jobs:
         env:
           OA_KEEP_PYTEST_RUNS: "1"
 
+      # The suite above skips the GUI launch test when there is no display.
+      # Here a display is required: Linux gets a virtual one via Xvfb.
+      - name: GUI launch smoke test
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update -q && sudo apt-get install -y -q xvfb
+            xvfb-run -a pytest -q tests/test_gui_launcher.py -k launches
+          else
+            pytest -q tests/test_gui_launcher.py -k launches
+          fi
+        shell: bash
+        env:
+          ROAP_REQUIRE_GUI: "1"
+
       - name: Run full pipeline E2E
         run: ./run_pipeline.sh examples/example_data.xlsx outputs/ci_test
         shell: bash
