@@ -1,6 +1,5 @@
 ## 2026-10-26
 
-- **Update**: Updated concept `decisions/portable-notebook-defaults.md`.
 - **Update**: Linked `decisions/engineering-decisions.md` to
   `decisions/portable-notebook-defaults.md` (P1 notebook defaults and
   live-reference cleanup follow the existing package rename and shared-engine

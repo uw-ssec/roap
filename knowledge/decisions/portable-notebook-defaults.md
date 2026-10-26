@@ -15,9 +15,7 @@ This note records the implementation choices for P1 issues
 [#54](https://github.com/uw-ssec/roap/issues/54) and
 [#55](https://github.com/uw-ssec/roap/issues/55), pending code PR review. Don
 authorized direct PR creation after Richard/Dinesh cross-review on 2026-10-26
-and required knowledge changes to be separate PRs (Buzz event
-`b47949d509054704eaaf6b887c6307994a4b7835a6f02b3524361e79f2c2f358` in channel
-`d86cc63a-1492-452e-9a3c-a4c7816b83e2`).
+and required knowledge changes to be separate PRs (maintainer direction).
 
 ## Portable defaults
 
