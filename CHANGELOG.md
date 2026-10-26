@@ -17,7 +17,8 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 - Desktop launcher: Cancel, Quit and closing the window now stop the whole
   pipeline process tree, including the Jupyter kernel, instead of leaving
-  papermill running in the background; quitting mid-run asks first
+  papermill running in the background, and force-stop anything still running 5
+  seconds later; quitting mid-run asks first
 - Desktop launcher: a cancelled run is reported as having incomplete outputs
   that must not be used
 - Desktop launcher: the output folder is no longer created when input validation

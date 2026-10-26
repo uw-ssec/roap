@@ -15,6 +15,8 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 
@@ -133,30 +135,68 @@ def _posix_descendants(pid: int) -> list[int]:
     return found
 
 
-def stop_process_tree(proc: subprocess.Popen) -> None:
+# How long a stopped run gets to exit on SIGTERM before it is SIGKILLed.
+STOP_GRACE_SECONDS = 5.0
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _signal_tree(pgid: int, pids: list[int], sig: int) -> None:
+    try:
+        os.killpg(pgid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+    for pid in pids:
+        try:
+            os.kill(pid, sig)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def _escalate(proc: subprocess.Popen, pids: list[int], grace: float) -> None:
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        if proc.poll() is not None and not any(_pid_alive(p) for p in pids):
+            return
+        time.sleep(0.1)
+    _signal_tree(proc.pid, [p for p in pids if _pid_alive(p)], signal.SIGKILL)
+
+
+def stop_process_tree(proc: subprocess.Popen) -> threading.Thread | None:
     """Terminate a process started with `process_group_kwargs` and its tree.
 
     POSIX: SIGTERM the whole process group, plus any descendant that left it.
     Jupyter starts each kernel in its own session, so killing the group alone
     would leave the kernel executing a notebook cell until it noticed its
-    parent was gone. Windows: `taskkill /T` walks the tree by parent PID.
+    parent was gone. Anything still alive after `STOP_GRACE_SECONDS` gets
+    SIGKILL. That wait runs on a returned non-daemon thread, so it never blocks
+    Tk and still finishes if the app quits meanwhile. The PIDs are captured
+    up front because detached descendants are untraceable once bash exits.
+    Windows: `taskkill /T /F` walks the tree by parent PID and kills outright.
     """
     if os.name == "nt":
         subprocess.run(
             ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
             capture_output=True,
         )
-        return
+        return None
     descendants = _posix_descendants(proc.pid)
-    try:
-        os.killpg(proc.pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        pass
-    for pid in descendants:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            pass
+    _signal_tree(proc.pid, descendants, signal.SIGTERM)
+    escalation = threading.Thread(
+        target=_escalate,
+        args=(proc, descendants, STOP_GRACE_SECONDS),
+        daemon=False,
+    )
+    escalation.start()
+    return escalation
 
 
 def to_bash_path(p: Path, bash_exe: str | None = None) -> str:

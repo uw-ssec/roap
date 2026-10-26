@@ -9,6 +9,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -178,12 +179,28 @@ print("stage running", flush=True)
 time.sleep(120)
 """
 
-# argv: pid file, output dir, action ("cancel" or "quit").
+# The same tree, but every process ignores SIGTERM, so only the SIGKILL
+# escalation can stop it.
+STUBBORN_PIPELINE = (
+    "import signal; signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+    + FAKE_PIPELINE.replace(
+        '"import time; time.sleep(120)"',
+        '"import signal, time; '
+        'signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(120)"',
+    )
+)
+PIPELINES = {"terminates": FAKE_PIPELINE, "ignores-sigterm": STUBBORN_PIPELINE}
+TEST_GRACE_SECONDS = 2.0
+
+# argv: pid file, output dir, action ("cancel" or "quit"), pipeline code.
 STOP_SCRIPT = """
 import os, sys
+import time
 import tkinter as tk
 import roap_app
+import roap_app_core
 
+roap_app_core.STOP_GRACE_SECONDS = %s
 pid_file, out_dir, action = sys.argv[1:4]
 fake = sys.argv[4]
 roap_app.build_command = lambda *a, **k: [sys.executable, "-c", fake, pid_file]
@@ -203,7 +220,9 @@ def stop():
         root.after(100, stop)
         return
     if action == "cancel":
+        t0 = time.monotonic()
         app._cancel()
+        print("CANCEL_SECS", time.monotonic() - t0)
         root.after(100, wait_cancelled)
     else:
         app._quit()
@@ -220,7 +239,7 @@ root.after(100, stop)
 root.mainloop()
 print("PIDS", app.proc.pid, open(pid_file).read())
 print("STATUS", app.status_var.get() if action == "cancel" else "")
-"""
+""" % TEST_GRACE_SECONDS
 
 
 def _alive(pid: int) -> bool:
@@ -247,14 +266,18 @@ def _assert_no_survivors(stdout: str) -> None:
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX process groups")
-def test_stop_process_tree_leaves_no_survivors(tmp_path: Path) -> None:
+@pytest.mark.parametrize("pipeline", PIPELINES)
+def test_stop_process_tree_leaves_no_survivors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pipeline: str
+) -> None:
     """The core helper alone, no display needed: the tree, kernel included, dies."""
     sys.path.insert(0, str(TOOLS))
     import roap_app_core as core
 
+    monkeypatch.setattr(core, "STOP_GRACE_SECONDS", TEST_GRACE_SECONDS)
     pid_file = tmp_path / "pids"
     proc = subprocess.Popen(
-        [sys.executable, "-c", FAKE_PIPELINE, str(pid_file)],
+        [sys.executable, "-c", PIPELINES[pipeline], str(pid_file)],
         stdout=subprocess.DEVNULL,
         **core.process_group_kwargs(),
     )
@@ -263,8 +286,17 @@ def test_stop_process_tree_leaves_no_survivors(tmp_path: Path) -> None:
         while not (pid_file.exists() and pid_file.read_text().strip()):
             assert time.monotonic() < deadline, "tree never started"
             time.sleep(0.05)
-        core.stop_process_tree(proc)
-        proc.wait(timeout=10)
+        # Like the GUI worker: another thread is blocked in wait() meanwhile.
+        waiter = threading.Thread(target=proc.wait)
+        waiter.start()
+        t0 = time.monotonic()
+        escalation = core.stop_process_tree(proc)
+        assert escalation is not None
+        escalation.join(timeout=TEST_GRACE_SECONDS + 10)
+        if pipeline == "terminates":
+            # A tree that exits on SIGTERM must not hold Quit for the grace.
+            assert time.monotonic() - t0 < TEST_GRACE_SECONDS / 2
+        waiter.join(timeout=10)
         _assert_no_survivors(f"PIDS {proc.pid} {pid_file.read_text()}")
     finally:
         if proc.poll() is None:
@@ -272,22 +304,32 @@ def test_stop_process_tree_leaves_no_survivors(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX process check")
-def test_gui_cancel_stops_whole_tree_and_flags_outputs(tmp_path: Path) -> None:
+@pytest.mark.parametrize("pipeline", PIPELINES)
+def test_gui_cancel_stops_whole_tree_and_flags_outputs(
+    tmp_path: Path, pipeline: str
+) -> None:
     out = tmp_path / "out"
     result = run_gui_script(
-        STOP_SCRIPT, str(tmp_path / "pids"), str(out), "cancel", FAKE_PIPELINE
+        STOP_SCRIPT, str(tmp_path / "pids"), str(out), "cancel", PIPELINES[pipeline]
     )
     _assert_no_survivors(result.stdout)
+    # The SIGKILL grace period must not block Tk's main thread.
+    secs = next(x for x in result.stdout.splitlines() if x.startswith("CANCEL_SECS"))
+    assert float(secs.split()[1]) < TEST_GRACE_SECONDS / 2, secs
     status = next(x for x in result.stdout.splitlines() if x.startswith("STATUS"))
     assert "Cancelled" in status and "incomplete" in status, status
     assert str(out) in status, status
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX process check")
-def test_gui_quit_mid_run_confirms_then_stops_whole_tree(tmp_path: Path) -> None:
+@pytest.mark.parametrize("pipeline", PIPELINES)
+def test_gui_quit_mid_run_confirms_then_stops_whole_tree(
+    tmp_path: Path, pipeline: str
+) -> None:
+    """With `ignores-sigterm`, the app must outlive its window until SIGKILL."""
     result = run_gui_script(
         STOP_SCRIPT, str(tmp_path / "pids"), str(tmp_path / "out"), "quit",
-        FAKE_PIPELINE,
+        PIPELINES[pipeline],
     )
     assert "RUNNING_AFTER_DECLINE True" in result.stdout, result.stdout
     _assert_no_survivors(result.stdout)
