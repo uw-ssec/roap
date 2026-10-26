@@ -83,7 +83,7 @@ def verify_bundle(run_dir: Path, output_root: Optional[Path] = None) -> bool:
         return False
 
     try:
-        manifest = json.loads(manifest_path.read_text())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return False
 
