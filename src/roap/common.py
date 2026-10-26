@@ -1013,12 +1013,6 @@ def _version_satisfies(current: str, required: str) -> bool:
 
 
 def _parse_version(v: str) -> tuple:
-    return tuple(map(int, v.split(".")[:3]))
-    if required.startswith("=="):
-        exact_ver = required[2:]
-        return _parse_version(current) == _parse_version(exact_ver)
-    return True
-
-
-def _parse_version(v: str) -> tuple:
-    return tuple(map(int, v.split(".")[:3]))
+    # Compare every numeric component so CalVer (2026.11.0) and the legacy
+    # SemVer (0.2.0) order correctly; int() also drops zero-padding (2026.09.0).
+    return tuple(map(int, v.strip().split(".")))

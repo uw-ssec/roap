@@ -15,8 +15,8 @@ def test_config_compatibility_gate_enforced():
     with config_path.open() as f:
         config = yaml.safe_load(f)
 
-    # Set to a version HIGHER than current (v0.2.0) to trigger failure
-    config["compatible_pipeline_version"] = ">=1.0.0"
+    # Set to a version HIGHER than any current CalVer release to trigger failure
+    config["compatible_pipeline_version"] = ">=9999.1.0"
 
     with tempfile.TemporaryDirectory() as tmpdir:
         # Write modified config
@@ -46,7 +46,7 @@ def test_config_compatibility_gate_allows_current_version():
     with config_path.open() as f:
         config = yaml.safe_load(f)
 
-    # Current version is v0.2.0 (from pyproject.toml)
+    # Every release (legacy 0.2.0 and all CalVer) satisfies >=0.2.0
     config["compatible_pipeline_version"] = ">=0.2.0"
 
     with tempfile.TemporaryDirectory() as tmpdir:
