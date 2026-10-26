@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -94,6 +95,68 @@ def kernel_available(python_exe: str) -> bool:
         return r.returncode == 0 and "python3" in r.stdout
     except Exception:
         return False
+
+
+def process_group_kwargs() -> dict:
+    """Popen kwargs that start the pipeline as the leader of its own group.
+
+    Cancel and Quit then stop bash *and* everything it launched, instead of
+    only bash (which used to leave papermill running, reparented to init).
+    """
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _posix_descendants(pid: int) -> list[int]:
+    """PIDs of every live descendant of `pid`, from one `ps` snapshot."""
+    try:
+        out = subprocess.run(
+            ["ps", "-A", "-o", "pid=", "-o", "ppid="],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+    except Exception:
+        return []
+    children: dict[int, list[int]] = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            children.setdefault(int(parts[1]), []).append(int(parts[0]))
+    found: list[int] = []
+    stack = [pid]
+    while stack:
+        for child in children.get(stack.pop(), []):
+            found.append(child)
+            stack.append(child)
+    return found
+
+
+def stop_process_tree(proc: subprocess.Popen) -> None:
+    """Terminate a process started with `process_group_kwargs` and its tree.
+
+    POSIX: SIGTERM the whole process group, plus any descendant that left it.
+    Jupyter starts each kernel in its own session, so killing the group alone
+    would leave the kernel executing a notebook cell until it noticed its
+    parent was gone. Windows: `taskkill /T` walks the tree by parent PID.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            capture_output=True,
+        )
+        return
+    descendants = _posix_descendants(proc.pid)
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
+    for pid in descendants:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
 
 
 def to_bash_path(p: Path, bash_exe: str | None = None) -> str:
