@@ -1,15 +1,14 @@
 # Notebook 02 — TA CRM QC and pH-standard QC
 
 > **Module-name note (post-audit):** This README predates the packaging of the
-> helpers into the installable `oa_pipeline` package. Where the text refers to
-> flat module names, the real import paths are: `oa_common.py` →
-> `oa_pipeline/common.py`, `oa_qc_ta_ph.py` → `oa_pipeline/qc_ta_ph.py`,
-> `oa_schema.py` → `oa_pipeline/schema.py`, `oa_policy.py` →
-> `oa_pipeline/policy.py`,
+> helpers into the installable `roap` package. Where the text refers to flat
+> module names, the real import paths are: `oa_common.py` → `roap/common.py`,
+> `oa_qc_ta_ph.py` → `roap/qc_ta_ph.py`, `oa_schema.py` → `roap/schema.py`,
+> `oa_policy.py` → `roap/policy.py`,
 > `oa_stage1b.py`/`oa_stage2.py`/`oa_stage3.py`/`oa_stage4.py` →
-> `oa_pipeline/stage1b.py` … `stage4.py`, `oa_inspect.py` →
-> `oa_pipeline/inspect.py`. The notebook code cells already use the correct
-> `from oa_pipeline.<module> import ...` form.
+> `roap/stage1b.py` … `stage4.py`, `oa_inspect.py` → `roap/inspect.py`. The
+> notebook code cells already use the correct `from roap.<module> import ...`
+> form.
 
 Second notebook of the split. **This one matters most** because its
 `derived.csv` is the file Stage 1A actually reads — get this right and the rest
@@ -166,7 +165,7 @@ immediately after it ([Papermill docs](https://github.com/nteract/papermill)).
 | Name                | Default                               | Meaning                                                                                                                                                              |
 | ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------- |
 | `CRM_CORRECT_TA`    | True                                  | Master switch for TA QC                                                                                                                                              |
-| `CRM_BATCH`         | `"213"`                               | Must exist in `configs/crm_certified_values.yaml` (or the corrected in-code fallback in `oa_pipeline/qc_ta_ph.py`).                                                  |
+| `CRM_BATCH`         | `"213"`                               | Must exist in `configs/crm_certified_values.yaml` (or the corrected in-code fallback in `roap/qc_ta_ph.py`).                                                         |
 | `CRM_VALUES_CONFIG` | `"configs/crm_certified_values.yaml"` | **Audit fix N-1.** Path to the authoritative certified CRM values, transcribed from the NOAA OCADS Dickson batch table. `None` → use the corrected in-code fallback. |
 | `CRM_TA_OVERRIDE`   | None                                  | Numeric value to override the certified TA                                                                                                                           |
 | `CRM_TAG_PREFIX`    | `"RM"`                                | CRM tag prefix                                                                                                                                                       |

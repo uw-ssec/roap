@@ -52,7 +52,7 @@ APP_TITLE = "OA Pipeline Runner"
 
 
 # ---------------------------------------------------------------------------
-# Logic lives in oa_pipeline_app_core (GUI-independent, unit-tested).
+# Logic lives in roap_app_core (GUI-independent, unit-tested).
 # ---------------------------------------------------------------------------
 
 from roap_app_core import (  # noqa: E402

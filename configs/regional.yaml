@@ -33,7 +33,7 @@ config_type: regional_reference
 
 # R-5 FIX: Pin to the pipeline version this config was written against.
 # Re-validate against the source if pipeline __version__ changes.
-# The pipeline exposes __version__ via oa_pipeline.__version__.
+# The pipeline exposes __version__ via roap.__version__.
 compatible_pipeline_version: ">=0.2.0"
 
 metadata:

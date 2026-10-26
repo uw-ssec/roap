@@ -1,11 +1,11 @@
 """
-oa_pipeline_app_core.py — GUI-independent logic for the desktop launcher
+roap_app_core.py — GUI-independent logic for the desktop launcher
 ========================================================================
 
 These functions contain all the real behaviour of the desktop app (project
 discovery, command building, environment checks, verdict summarising) with no
 dependency on Tkinter, so they can be unit-tested in a headless environment and
-reused by any front end. `oa_pipeline_app.py` imports from here.
+reused by any front end. `roap_app.py` imports from here.
 """
 
 from __future__ import annotations

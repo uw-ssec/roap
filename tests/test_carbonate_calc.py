@@ -1,4 +1,4 @@
-"""Tests for oa_pipeline.carbonate_calc — internal carbonate-system calculation.
+"""Tests for roap.carbonate_calc — internal carbonate-system calculation.
 
 These lock in the validated behaviour: PyCO2SYS with the pinned settings must
 reproduce the reference CO2SYS-Excel output on raw TA, applying the RM

@@ -1,7 +1,7 @@
 """
 tests/test_readiness.py
 =======================
-Tests for oa_pipeline.stage4 readiness classification.
+Tests for roap.stage4 readiness classification.
 
 These tests pin the Stage 4 PASS, REVIEW, and FAIL verdict logic, the reason
 code mapping, missing key detection, duplicate detection, and reason code
