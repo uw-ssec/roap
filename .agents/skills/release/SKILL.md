@@ -1,7 +1,7 @@
 ---
 name: release
 description:
-  Use when a new version needs cutting — a semver bump, changelog entry, git
+  Use when a new version needs cutting — a CalVer version, changelog entry, git
   tag, GitHub release, and plugin zip assets.
 ---
 
@@ -12,25 +12,21 @@ assets.
 
 ## Arguments
 
-Optional: version bump type — `patch`, `minor`, or `major`. Defaults to
-analyzing changes.
+None. The version is derived from today's date.
 
 ## Instructions
 
-1. Determine the version bump:
-
-   - If `patch`, `minor`, or `major` was passed, use that
-   - If not specified, analyze commits since the last tag to determine:
-     - `major`: breaking changes (commits with `!` or `BREAKING CHANGE`)
-     - `minor`: new features (`feat:` commits)
-     - `patch`: fixes, refactors, docs, chores only
+1. Determine the release month: today's `YYYY.0M` (e.g. `2026.11`).
 
 2. Get the current version:
 
    - Check `git tag --sort=-v:refname | head -1` for the latest tag
-   - If no tags exist, start at `v0.1.0`
+   - Tags before `v2026.11.0` used SemVer (`v0.2.0`); ignore them for the MICRO
+     calculation
 
-3. Calculate the new version following semver.
+3. Calculate the new version following [CalVer](https://calver.org/)
+   `YYYY.0M.MICRO`, as [xarray](https://github.com/pydata/xarray/tags) does —
+   see [Version Guidelines](#version-guidelines).
 
 4. Verify readiness:
 
@@ -40,16 +36,18 @@ analyzing changes.
 
 5. Read `CHANGELOG.md` and check that the `[Unreleased]` section has content.
 
-6. Update `CHANGELOG.md`:
+6. Update `CHANGELOG.md` and `pyproject.toml`:
 
-   - Rename `[Unreleased]` to `[X.Y.Z] -- YYYY-MM-DD` (today's date)
+   - Rename `[Unreleased]` to `[YYYY.0M.MICRO] -- YYYY-MM-DD` (today's date)
    - Add a new empty `[Unreleased]` section above it
+   - Set `version = "YYYY.0M.MICRO"` in `pyproject.toml`, then run
+     `pixi install` so the editable install reports the new version
 
-7. Commit the changelog update:
+7. Commit the release preparation:
 
    ```bash
-   git add CHANGELOG.md
-   git commit -m "chore(release): prepare vX.Y.Z" -m "Assisted-by: <harness>:<model>"
+   git add CHANGELOG.md pyproject.toml
+   git commit -m "chore(release): prepare vYYYY.0M.MICRO" -m "Assisted-by: <harness>:<model>"
    ```
 
    See the `commit` skill for the trailer format. Omit it entirely if the
@@ -58,7 +56,7 @@ analyzing changes.
 8. Create the git tag:
 
    ```bash
-   git tag -a vX.Y.Z -m "vX.Y.Z"
+   git tag -a vYYYY.0M.MICRO -m "vYYYY.0M.MICRO"
    ```
 
 9. Push the commit and tag:
@@ -86,7 +84,7 @@ analyzing changes.
 11. Create a GitHub release with plugin zips as assets:
 
     ```bash
-    gh release create vX.Y.Z --title "vX.Y.Z" \
+    gh release create vYYYY.0M.MICRO --title "vYYYY.0M.MICRO" \
       --notes "$(cat <<'EOF'
     ## What's Changed
 
@@ -96,7 +94,7 @@ analyzing changes.
 
     <list each plugin zip with name and description>
 
-    **Full Changelog**: <repo compare URL>/compare/vPREVIOUS...vX.Y.Z
+    **Full Changelog**: <repo compare URL>/compare/vPREVIOUS...vYYYY.0M.MICRO
     EOF
     )" \
       plugin_name_MM_DD_YYYY.zip
@@ -104,15 +102,22 @@ analyzing changes.
 
 12. Clean up zip files from the repo root after successful upload.
 
-13. Confirm: "Released vX.Y.Z — <release URL>"
+13. Confirm: "Released vYYYY.0M.MICRO — <release URL>"
 
 ## Version Guidelines
 
-| Bump            | When                               | Example             |
-| --------------- | ---------------------------------- | ------------------- |
-| `patch` (0.1.X) | Bug fixes, docs, chores, refactors | `v0.1.1` → `v0.1.2` |
-| `minor` (0.X.0) | New features, non-breaking changes | `v0.1.2` → `v0.2.0` |
-| `major` (X.0.0) | Breaking changes, major rewrites   | `v0.2.0` → `v1.0.0` |
+Format: `YYYY.0M.MICRO` — four-digit year, zero-padded month, and a MICRO
+counter that starts at `0` for the first release of the month and increments for
+each further release that month. The version carries no compatibility meaning;
+note breaking changes in `CHANGELOG.md`.
+
+| Situation                         | Example                     |
+| --------------------------------- | --------------------------- |
+| First release in a month          | `v2026.11.0`                |
+| Another release in the same month | `v2026.11.0` → `v2026.11.1` |
+| First release in a new month      | `v2026.11.1` → `v2026.12.0` |
+
+`pyproject.toml` holds the same string without the `v` (`2026.11.0`).
 
 ## Zip Naming Rules
 
@@ -127,7 +132,7 @@ analyzing changes.
 - Must be on `main` branch with no uncommitted changes
 - Must have content in `[Unreleased]` section of CHANGELOG.md
 - Never create a release from a feature branch
-- Tag format is always `vX.Y.Z` (with `v` prefix)
+- Tag format is always `vYYYY.0M.MICRO` (with `v` prefix, zero-padded month)
 - Ask for confirmation before pushing the tag and creating the release
 - If CHANGELOG.md doesn't exist or has no `[Unreleased]` section, warn and ask
   how to proceed

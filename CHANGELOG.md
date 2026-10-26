@@ -1,5 +1,18 @@
 # Changelog
 
+Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
+[xarray](https://github.com/pydata/xarray) does), tagged `vYYYY.0M.MICRO`.
+`0.2.0` was the last SemVer release.
+
+## [Unreleased]
+
+### Changed
+
+- Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`; the first CalVer
+  release will be tagged `v2026.11.0` or later
+- Config compatibility gate compares every version component, so CalVer releases
+  and same-month MICRO releases order correctly
+
 ## [0.2.0] - 2026-10-11
 
 ### Added
