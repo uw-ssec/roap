@@ -2,9 +2,9 @@
 type: Fact
 title: Open Questions for Engineering
 description:
-  "8 open questions: queryable layer scope (gates P3), PyCO2SYS version, real
-  dataset access, GPG signing, PyPI publishing, cross-platform vs export, wider
-  codebase, data volume"
+  "8 engineering questions: queryable layer scope (resolved: NetCDF, ADR-0001),
+  PyCO2SYS version, real dataset access, GPG signing, PyPI publishing,
+  cross-platform vs export, wider codebase, data volume"
 tags:
   [open-questions, adr, pyco2sys, dataset, gpg, pypi, sequencing, performance]
 generated: { by: agent/cli, at: "2026-10-02T00:44:29Z" }
@@ -13,7 +13,7 @@ status: stable
 
 # Open Questions for Engineering
 
-## 1. Queryable Layer Scope (ADR-0001) - GATES P3
+## 1. Queryable Layer Scope (ADR-0001) - RESOLVED
 
 **Question**: DuckDB (Option A) vs File-based manifest (Option B)?
 
@@ -22,6 +22,13 @@ status: stable
   pandas/duckdb on files **Decider**: Lead + Prof. Adjei **Criteria**: Team
   capacity, Nadia's timeline, Fatou's reuse needs, maintenance burden
   **Blocks**: P3 export design (GOA-ON structure differs fundamentally)
+
+**Decision**: Neither. Option C, NetCDF export (GOA-ON template, CF
+conventions), was accepted on 2026-10-09. The pipeline output is NetCDF, and
+neither DuckDB nor a plain CSV/manifest will be supported. See ADR-0001 in
+[ADRs](../decisions/adrs.md) and
+[Engineering Decisions §1](../decisions/engineering-decisions.md). P3 export
+design is unblocked.
 
 ## 2. PyCO2SYS Version
 

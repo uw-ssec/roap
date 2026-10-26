@@ -49,7 +49,7 @@ status: stable
 
 ## Open Questions for Engineering
 
-1. Queryable layer scope - DB vs files (gates P3 export design)
+1. Queryable layer scope - resolved: NetCDF export (ADR-0001), not DB or files
 2. Cross-platform vs international export sequencing
 3. Wider codebase context (1 of 4 related codebases)
 4. Data volume/performance needs
