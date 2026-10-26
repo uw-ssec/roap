@@ -2,9 +2,9 @@
 type: Decision
 title: Architecture Decision Records
 description:
-  "10 ADRs covering queryable layer, CI, invariant test, config aliases, Excel
+  "11 ADRs covering queryable layer, CI, invariant test, config aliases, Excel
   round-trip, CRM detection, property testing, regression gate, Frontiers 2021,
-  single engine"
+  single engine, notebooks as thin doors"
 tags: [adr, architecture, decisions]
 generated: { by: agent/cli, at: "2026-10-02T00:45:10Z" }
 status: stable
@@ -14,18 +14,19 @@ status: stable
 
 ## ADR Index
 
-| ID   | Title                                           | Status                      | Date       | Deciders          |
-| ---- | ----------------------------------------------- | --------------------------- | ---------- | ----------------- |
-| 0001 | Queryable Time-Series Layer Scope               | Accepted (Option C: NetCDF) | 2026-10-09 | Lead, Prof. Adjei |
-| 0002 | Cross-Platform CI Before GOA-ON Export          | Proposed                    | 2026-09-29 | Lead              |
-| 0003 | Invariant Test in CI (Not Post-CI)              | Accepted                    | 2026-09-29 | Lead              |
-| 0004 | Config-Driven Schema Aliases                    | Proposed                    | -          | Lead, Fatou input |
-| 0005 | Excel Round-Trip: Pandas Read/Write Only        | Proposed                    | -          | Lead              |
-| 0006 | CRM/Std Detection by Tag Prefix Only            | Accepted                    | 2026-09-29 | Lead, Maurice     |
-| 0007 | Property-Based Testing for Schema/Normalization | Proposed                    | -          | Lead              |
-| 0008 | Real Dataset as Manual Regression Gate          | Accepted                    | 2026-09-29 | Lead              |
-| 0009 | Frontiers 2021 as Default Schema Standard       | Accepted                    | 2026-09-29 | Lead              |
-| 0010 | Single Engine, Three Doors (CLI/GUI/Notebook)   | Accepted                    | 2026-09-29 | Lead              |
+| ID   | Title                                               | Status                      | Date       | Deciders          |
+| ---- | --------------------------------------------------- | --------------------------- | ---------- | ----------------- |
+| 0001 | Queryable Time-Series Layer Scope                   | Accepted (Option C: NetCDF) | 2026-10-09 | Lead, Prof. Adjei |
+| 0002 | Cross-Platform CI Before GOA-ON Export              | Proposed                    | 2026-09-29 | Lead              |
+| 0003 | Invariant Test in CI (Not Post-CI)                  | Accepted                    | 2026-09-29 | Lead              |
+| 0004 | Config-Driven Schema Aliases                        | Proposed                    | -          | Lead, Fatou input |
+| 0005 | Excel Round-Trip: Pandas Read/Write Only            | Proposed                    | -          | Lead              |
+| 0006 | CRM/Std Detection by Tag Prefix Only                | Accepted                    | 2026-09-29 | Lead, Maurice     |
+| 0007 | Property-Based Testing for Schema/Normalization     | Proposed                    | -          | Lead              |
+| 0008 | Real Dataset as Manual Regression Gate              | Accepted                    | 2026-09-29 | Lead              |
+| 0009 | Frontiers 2021 as Default Schema Standard           | Accepted                    | 2026-09-29 | Lead              |
+| 0010 | Single Engine, Three Doors (CLI/GUI/Notebook)       | Accepted                    | 2026-09-29 | Lead              |
+| 0011 | Notebooks Are Thin Doors; No Papermill on Main Path | Accepted                    | 2026-10-26 | Lead              |
 
 ## Key Accepted Decisions
 
@@ -42,6 +43,17 @@ status: stable
   See `engineering-decisions.md` S1.
 - **ADR-0010**: Single engine (src/roap/), three doors (CLI, GUI, Notebook) -
   all call same core
+- **ADR-0011**: Each Stage exposes `run(inputs, config) -> StageResult` and
+  `roap.pipeline.run_pipeline` owns Stage ordering and the output layout. CLI,
+  GUI and `run_pipeline.sh` call it in-process; notebooks 02-08 only call their
+  Stage's `run` and add human-facing views. Papermill leaves the main path.
+  _Why_: notebooks had become the de facto orchestrator (step order, config
+  merging, file names copied per notebook), which made ADR-0010's "one engine"
+  untrue, let config precedence drift per door, and forced every stage-level
+  test through slow subprocess runs. _Rejected_: keeping papermill as the
+  orchestrator with `run` called inside each notebook (keeps Jupyter as a hidden
+  part of every run's interface); retiring notebooks entirely (loses the
+  per-Stage human view).
 
 ## Pending Decisions
 
