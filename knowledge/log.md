@@ -1,3 +1,12 @@
+## 2026-10-26
+
+- **Creation**: Documented concept `decisions/invariant-test-comparison.md`
+  (Invariant tests compare each stage with its own input, as exact text).
+- **Creation**: Documented concept `decisions/automated-pypi-publishing.md`
+  (Automated publishing to TestPyPI and PyPI with trusted publishing).
+- **Update**: Linked `decisions/engineering-decisions.md` sections 5 and 9 to
+  the new concepts.
+
 ## 2026-10-18
 
 ### PR Review Resolution, CI Fixes, History Restoration, P1 Completion
