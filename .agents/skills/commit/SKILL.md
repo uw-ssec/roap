@@ -36,7 +36,7 @@ type(scope): short imperative description
 Optional body explaining the why, not the what.
 Multi-line is fine for complex changes.
 
-Co-Authored-By: <tool name>
+Assisted-by: <harness>:<model>
 EOF
 )"
 ```
@@ -50,19 +50,25 @@ EOF
 Disclosure is required, lightweight, and shame-free — its purpose is reviewer
 calibration and later process analysis, not judgment.
 
-On an AI-assisted commit, end the message with a `Co-Authored-By:` trailer
-naming the tool, with **no `<email>` component**:
+On an AI-assisted commit, end the message with an `Assisted-by:` trailer, as
+required by [`AI_POLICY.md`](../../../AI_POLICY.md). It follows the
+[Linux kernel convention](https://docs.kernel.org/process/coding-assistants.html):
+the coding agent as a lowercase, hyphenated slug and the model identifier it
+reports, joined by a colon into one token:
 
 ```
-Co-Authored-By: Claude Opus 5 via Claude Code
+Assisted-by: claude-code:claude-fable-5-1
 ```
 
-Use the same tool/model/version string as the "AI assistance disclosure" section
-of `.github/pull_request_template.md`, so the commit and the PR agree.
+Specialized analysis tools may follow the model (e.g.
+`Assisted-by: claude-code:claude-fable-5-1 mypy`); basic tools such as git,
+formatters and test runners are not listed.
 
-Without an email, GitHub does not resolve the trailer to an account — it stays
-plain text in the commit message, readable and greppable for process analysis.
-For naming a tool rather than a person, that is the intended outcome.
+Only humans can be named as co-authors, and AI can never sign off on a commit:
+never add `Co-Authored-By:` or `Signed-off-by:` for an AI tool.
+
+Use the same `<harness>:<model>` string in the "AI assistance disclosure"
+section of `.github/pull_request_template.md`, so the commit and the PR agree.
 
 ## Conventional Commit Types
 
@@ -86,8 +92,9 @@ For naming a tool rather than a person, that is the intended outcome.
 - Scope is optional but preferred when changes are localized
 - Never skip hooks (`--no-verify`)
 - Never amend unless explicitly asked
-- On an AI-assisted commit, add a `Co-Authored-By:` trailer naming the tool, in
-  the email-free form shown in [AI Attribution](#ai-attribution)
+- On an AI-assisted commit, add an `Assisted-by: <harness>:<model>` trailer as
+  shown in [AI Attribution](#ai-attribution); never a `Co-Authored-By:` or
+  `Signed-off-by:` for an AI tool
 - An `ai-assisted` label on the PR is an accepted companion or alternative — the
   workflow takes a label and/or a trailer
 - NEVER add "Generated with" or similar marketing lines. This is attribution,
