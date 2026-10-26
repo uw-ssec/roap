@@ -15,7 +15,7 @@
 - [AI-Friendly PRD](ai-prd.md) - Complete PRD for ROAP v1.0.0: objective,
   12-week timeline, constraints, non-goals, code paths, glossary, acceptance
   criteria, references, risks, metrics, open questions
-- [Open Questions for Engineering](open-questions.md) - 8 open questions:
-  queryable layer scope (gates P3), PyCO2SYS version, real dataset access, GPG
-  signing, PyPI publishing, cross-platform vs export, wider codebase, data
-  volume
+- [Open Questions for Engineering](open-questions.md) - 8 engineering questions:
+  queryable layer scope (resolved: NetCDF, ADR-0001), PyCO2SYS version, real
+  dataset access, GPG signing, PyPI publishing, cross-platform vs export, wider
+  codebase, data volume
