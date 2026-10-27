@@ -58,7 +58,7 @@ def test_write_version_stamps_only_project_version(tmp_path: Path) -> None:
     assert rv.pyproject_version(pyproject) == "2026.11.0.dev3"
     changed = [
         (a, b)
-        for a, b in zip(original.splitlines(), pyproject.read_text().splitlines())
+        for a, b in zip(original.splitlines(), pyproject.read_text(encoding="utf-8").splitlines())
         if a != b
     ]
     assert len(changed) == 1, changed
@@ -73,7 +73,7 @@ def test_check_tag() -> None:
 
 
 def test_publish_workflow_routes_main_to_testpypi_and_release_to_pypi() -> None:
-    wf = yaml.safe_load((REPO_ROOT / ".github/workflows/publish.yml").read_text())
+    wf = yaml.safe_load((REPO_ROOT / ".github/workflows/publish.yml").read_text(encoding="utf-8"))
     # PyYAML reads the bare `on:` key as True.
     triggers = wf[True]
     assert triggers["push"]["branches"] == ["main"]
