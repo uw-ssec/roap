@@ -32,11 +32,11 @@ running with no window.
 1. **Launch as a process group.** POSIX uses `start_new_session=True`; Windows
    uses `CREATE_NEW_PROCESS_GROUP`. Cancel, Quit and window-close all stop the
    run through one function, `stop_process_tree`.
-2. **Stop the group and its detached descendants.** POSIX sends `killpg(SIGTERM)`
-   and also SIGTERM to every descendant in a `ps` snapshot taken first. The
-   snapshot is required because jupyter_client starts each kernel in its own
-   session, outside the group, so `killpg` alone leaves the kernel running.
-   Windows uses `taskkill /T /F`.
+2. **Stop the group and its detached descendants.** POSIX sends
+   `killpg(SIGTERM)` and also SIGTERM to every descendant in a `ps` snapshot
+   taken first. The snapshot is required because jupyter_client starts each
+   kernel in its own session, outside the group, so `killpg` alone leaves the
+   kernel running. Windows uses `taskkill /T /F`.
 3. **Escalate to SIGKILL after `STOP_GRACE_SECONDS` (5 s).** The wait runs on a
    non-daemon thread, which keeps Tk responsive and still completes after Quit
    destroys the window. It ends early only when bash is reaped, the original
@@ -44,7 +44,7 @@ running with no window.
    check catches members born after the snapshot, for example one started by a
    SIGTERM handler; the snapshot catches the kernels that left the group.
 4. **Warn instead of deleting.** After a cancel, the status line and log say
-   *"Cancelled. Outputs in <out_dir> are incomplete and must not be used."*
+   _"Cancelled. Outputs in <out_dir> are incomplete and must not be used."_
    Deleting the in-flight stage folder would mean the app guessing an `rm -rf`
    target inside a path the user chose, so it is not done.
 5. **Confirm before quitting a running pipeline.**
@@ -63,5 +63,5 @@ running with no window.
 
 - The survivor tests are POSIX-only. On Windows only the dry-run click runs in
   CI, so the `taskkill` path has no survivor evidence.
-- A dry run still leaves an empty output folder, created by
-  `run_pipeline.sh`'s `abs_dir_create`. That is outside the launcher.
+- A dry run still leaves an empty output folder, created by `run_pipeline.sh`'s
+  `abs_dir_create`. That is outside the launcher.

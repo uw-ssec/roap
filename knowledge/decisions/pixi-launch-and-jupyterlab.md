@@ -37,9 +37,9 @@ This note records the onboarding decision implemented by Dinesh in
 
 ## Lock-file note
 
-Pixi 0.82 rewrites `pixi.lock` in format 7, which older Pixi clients cannot
-read ([prefix.dev: lock file v7](https://prefix.dev/blog/lock-file-v7)). For #69
-the lock was regenerated with Pixi 0.65 to stay in format 6. The diff only adds
+Pixi 0.82 rewrites `pixi.lock` in format 7, which older Pixi clients cannot read
+([prefix.dev: lock file v7](https://prefix.dev/blog/lock-file-v7)). For #69 the
+lock was regenerated with Pixi 0.65 to stay in format 6. The diff only adds
 lines (+1,341): every existing package artifact is kept, and JupyterLab 4.6.4
 resolves on all four platforms. Any PR that moves the lock to format 7 must be
 re-locked after #69 lands.
