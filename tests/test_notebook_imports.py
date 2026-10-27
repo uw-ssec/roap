@@ -17,6 +17,7 @@ For a reproducibility tool a silent wrong answer is worse than a crash, so:
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -24,10 +25,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOKS = sorted((REPO_ROOT / "notebooks").glob("*.ipynb"))
 
-# The figure notebooks carry stale Windows INPUT paths containing the old
-# project directory name. Those are interactive defaults overridden on every
-# run, not imports, so they are tracked separately rather than silently allowed.
-_WINDOWS_PATH_MARKER = r"C:\Users"
+_USER_PATH = re.compile(r"[A-Za-z]:[\\/]Users[\\/]|/(?:Users|home)/", re.IGNORECASE)
 
 
 def _code_lines(nb_path: Path):
@@ -44,14 +42,26 @@ def test_no_old_package_name_in_code_cells(nb_path: Path) -> None:
     """No executable cell imports or version-queries the old package name."""
     offenders = []
     for idx, line in _code_lines(nb_path):
-        if _WINDOWS_PATH_MARKER in line:
-            continue  # stale interactive default, not an import
         if "oa_pipeline" in line or "oa-pipeline" in line:
             offenders.append(f"cell{idx}: {line.strip()}")
 
     assert not offenders, (
         f"{nb_path.name} still references the pre-rename package in executable "
         f"code:\n  " + "\n  ".join(offenders)
+    )
+
+
+@pytest.mark.parametrize("nb_path", NOTEBOOKS, ids=lambda p: p.name)
+def test_no_absolute_user_paths_in_code_cells(nb_path: Path) -> None:
+    """Interactive defaults must work outside a contributor's home directory."""
+    offenders = [
+        f"cell{idx}: {line.strip()}"
+        for idx, line in _code_lines(nb_path)
+        if _USER_PATH.search(line)
+    ]
+    assert not offenders, (
+        f"{nb_path.name} contains absolute user paths in executable code:\n  "
+        + "\n  ".join(offenders)
     )
 
 

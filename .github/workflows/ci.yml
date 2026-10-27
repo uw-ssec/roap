@@ -11,7 +11,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os:
+          [
+            blacksmith-4vcpu-ubuntu-2404,
+            blacksmith-6vcpu-macos-15,
+            blacksmith-4vcpu-windows-2025,
+          ]
       fail-fast: false
     timeout-minutes: 30
 
@@ -56,6 +61,20 @@ jobs:
         shell: bash
         env:
           OA_KEEP_PYTEST_RUNS: "1"
+
+      # The suite above skips the GUI launch test when there is no display.
+      # Here a display is required: Linux gets a virtual one via Xvfb.
+      - name: GUI launch smoke test
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update -q && sudo apt-get install -y -q xvfb
+            xvfb-run -a pytest -q tests/test_gui_launcher.py -k launches
+          else
+            pytest -q tests/test_gui_launcher.py -k launches
+          fi
+        shell: bash
+        env:
+          ROAP_REQUIRE_GUI: "1"
 
       - name: Run full pipeline E2E
         run: ./run_pipeline.sh examples/example_data.xlsx outputs/ci_test

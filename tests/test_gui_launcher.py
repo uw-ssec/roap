@@ -5,6 +5,7 @@ The launcher lives in ``tools/`` per the plan. ``roap_app.py`` imports
 both files must stay in the same directory.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -61,7 +62,7 @@ def test_app_core_finds_repo_root_from_tools() -> None:
 def test_gui_app_compiles() -> None:
     """The Tkinter app parses and byte-compiles.
 
-    It is not launched: a Tk mainloop needs a display and would hang CI.
+    Launching is covered separately by test_gui_app_launches_and_closes.
     """
     result = subprocess.run(
         [sys.executable, "-m", "py_compile", str(APP)],
@@ -83,3 +84,42 @@ def test_gui_app_imports_core_as_sibling() -> None:
 def test_repo_root_has_launcher_markers(marker: str) -> None:
     """find_project_root keys off these two; both must exist at the root."""
     assert (REPO_ROOT / marker).exists(), f"Missing root marker: {marker}"
+
+
+# Builds the real window, runs the Tk mainloop briefly, then closes it. Runs in
+# a subprocess so a hang hits the timeout instead of stalling the test session.
+LAUNCH_SCRIPT = """
+import tkinter as tk
+import roap_app
+
+root = tk.Tk()
+app = roap_app.PipelineApp(root)
+root.update()
+assert root.title() == roap_app.APP_TITLE, root.title()
+root.after(1500, root.destroy)
+root.mainloop()
+print("GUI_SMOKE_OK")
+"""
+
+
+def test_gui_app_launches_and_closes() -> None:
+    """The launcher opens its window, runs the event loop, and closes cleanly.
+
+    Needs a display. Without one the test skips, unless ROAP_REQUIRE_GUI=1
+    (set by CI), where a missing display is a failure rather than a skip.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", LAUNCH_SCRIPT],
+        capture_output=True,
+        text=True,
+        cwd=TOOLS,
+        timeout=120,
+    )
+    no_display = "TclError" in result.stderr and "display" in result.stderr.lower()
+    if no_display and os.environ.get("ROAP_REQUIRE_GUI") != "1":
+        pytest.skip("no display available for Tk")
+    assert result.returncode == 0, f"GUI launch failed:\n{result.stderr}"
+    assert "GUI_SMOKE_OK" in result.stdout
+    # Tk reports exceptions raised in callbacks (e.g. _drain_log) on stderr
+    # without changing the exit code.
+    assert "Exception in Tkinter callback" not in result.stderr, result.stderr

@@ -12,3 +12,7 @@
   (Option B: File Manifest), PyCO2SYS v1 stable, dataset access, GPG deferral,
   manual PyPI, CI strategy, single engine, Frontiers 2021, invariant tests,
   config gate
+
+* [Portable notebook defaults and live package references](portable-notebook-defaults.md) -
+  P1 notebooks use repository-local inputs while Papermill overrides and
+  historical prototype references remain intact.
