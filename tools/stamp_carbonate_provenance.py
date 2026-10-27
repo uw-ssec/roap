@@ -31,8 +31,7 @@ DIC-unit-missing REVIEW flag and lets the strict DIC species audit run.
 
 Usage
 -----
-    .venv\\Scripts\\python.exe stamp_carbonate_provenance.py \\
-        "C:/Users/OA_2023-03/Projects/oa_pipeline/data/raw/oa_data_apr.xlsx"
+    pixi run python tools/stamp_carbonate_provenance.py path/to/workbook.xlsx
 
 Writes a NEW file alongside the original (……_provenance.xlsx) by default so
 the source workbook is never mutated in place; pass --in-place to overwrite.
