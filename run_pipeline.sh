@@ -35,7 +35,7 @@
 #                         02, 04, 05, 06, 07, 08.
 #     --dry-run           Print Papermill commands but do not run them.
 #                         In dry run mode, downstream required output files,
-#                         Papermill, and oa_pipeline import checks are skipped.
+#                         Papermill, and roap import checks are skipped.
 #     -h, --help          Show this help and exit.
 #
 # Environment:
