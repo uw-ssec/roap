@@ -2,7 +2,7 @@
 # ---------------------------------------------------------------------------
 # Per-stage overrides for Notebook 07 (Stage 3 carbonate integrity checks),
 # applied by run_pipeline.sh via --config-dir and merged onto
-# oa_pipeline.stage3.STAGE3_DEFAULTS.
+# roap.stage3.STAGE3_DEFAULTS.
 #
 # Why: in this dataset the carbonate system was solved from the TA + pH input
 # pair, so the CO2SYS-derived pH (ph_co2sys) is the measured pH (ph_best)

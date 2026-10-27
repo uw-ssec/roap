@@ -1,7 +1,7 @@
 """
 tests/test_app_core.py
 ======================
-Tests for the GUI-independent launcher logic in oa_pipeline_app_core.
+Tests for the GUI-independent launcher logic in roap_app_core.
 
 These do not require Tkinter or a display, so they run anywhere pytest does.
 """

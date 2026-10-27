@@ -416,3 +416,9 @@ typos instead of allowlisting. **Decider**: Lead ✅ **Implemented in**:
 - [AI-Friendly PRD](../project/ai-prd.md)
 - [Implementation Design](../../superpowers/specs/2026-10-05-roap-v1-implementation-design.md)
 - [Implementation Plan](../../superpowers/plans/2026-10-05-roap-v1-implementation-plan.md)
+
+# Related Concepts
+
+- [Portable notebook defaults and live package references](portable-notebook-defaults.md):
+  P1 notebook defaults and live-reference cleanup follow the existing package
+  rename and shared-engine decisions.

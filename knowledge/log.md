@@ -1,3 +1,12 @@
+## 2026-10-26
+
+- **Update**: Linked `decisions/engineering-decisions.md` to
+  `decisions/portable-notebook-defaults.md` (P1 notebook defaults and
+  live-reference cleanup follow the existing package rename and shared-engine
+  decisions.).
+- **Creation**: Documented concept `decisions/portable-notebook-defaults.md`
+  (Portable notebook defaults and live package references).
+
 ## 2026-10-18
 
 ### PR Review Resolution, CI Fixes, History Restoration, P1 Completion

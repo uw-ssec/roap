@@ -1,11 +1,11 @@
 """
-oa_pipeline_app_core.py — GUI-independent logic for the desktop launcher
+roap_app_core.py — GUI-independent logic for the desktop launcher
 ========================================================================
 
 These functions contain all the real behaviour of the desktop app (project
 discovery, command building, environment checks, verdict summarising) with no
 dependency on Tkinter, so they can be unit-tested in a headless environment and
-reused by any front end. `oa_pipeline_app.py` imports from here.
+reused by any front end. `roap_app.py` imports from here.
 """
 
 from __future__ import annotations
@@ -285,7 +285,8 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not project_root:
         problems.append(
             "Could not find the project root (run_pipeline.sh + notebooks/). "
-            "Place the app in the project folder."
+            "Keep tools/roap_app.py in the repository and launch it from "
+            "the repository root with pixi run python tools/roap_app.py."
         )
         return problems
     if not bash_exe:
@@ -296,13 +297,13 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not package_importable(python_exe):
         problems.append(
             f"roap is not importable by {python_exe}. "
-            'Run: pip install -e ".[dev]"'
+            "From the repository root, run pixi install, then "
+            "pixi run python tools/roap_app.py."
         )
     if not kernel_available(python_exe):
         problems.append(
-            "No Jupyter 'python3' kernel detected. Run: "
-            f"{python_exe} -m pip install ipykernel && "
-            f"{python_exe} -m ipykernel install --user --name python3"
+            "No Jupyter 'python3' kernel detected. From the repository root, "
+            "run pixi install, then pixi run python tools/roap_app.py."
         )
     return problems
 
