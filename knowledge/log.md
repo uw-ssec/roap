@@ -1,3 +1,12 @@
+## 2026-10-27
+
+- **Creation**: Documented concept `decisions/gui-cancel-stops-process-tree.md`
+  (GUI Cancel and Quit stop the whole pipeline process tree).
+- **Creation**: Documented concept `decisions/pixi-launch-and-jupyterlab.md`
+  (GUI and notebooks launch through Pixi, with JupyterLab locked).
+- **Update**: Linked `decisions/engineering-decisions.md` section 13 to the new
+  concepts.
+
 ## 2026-10-18
 
 ### PR Review Resolution, CI Fixes, History Restoration, P1 Completion

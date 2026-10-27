@@ -224,6 +224,11 @@ with `roap` package name; avoids confusion. Both `roap_app.py` and
 `roap_app_core.py` renamed and updated. **Decider**: Lead ✅ **Implemented in**:
 P-1 migration (Week 1-2).
 
+**Update (2026-10-27)**: The launcher runs through Pixi and stops the whole
+pipeline tree on Cancel/Quit; see
+[GUI and notebooks launch through Pixi](pixi-launch-and-jupyterlab.md) and
+[GUI Cancel and Quit stop the whole pipeline process tree](gui-cancel-stops-process-tree.md).
+
 ---
 
 ## 14. Notebook Import Updates
