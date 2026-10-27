@@ -14,7 +14,11 @@ def test_ci_workflow_exists_and_valid():
     assert "strategy" in workflow["jobs"]["test"]
     matrix = workflow["jobs"]["test"]["strategy"]["matrix"]
     assert "os" in matrix
-    assert set(matrix["os"]) == {"ubuntu-latest", "macos-latest", "windows-latest"}
+    assert set(matrix["os"]) == {
+        "blacksmith-4vcpu-ubuntu-2404",
+        "blacksmith-6vcpu-macos-15",
+        "blacksmith-4vcpu-windows-2025",
+    }
 
     # Python 3.11
     setup_python_step = next(s for s in workflow["jobs"]["test"]["steps"]
