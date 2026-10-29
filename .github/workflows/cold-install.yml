@@ -57,11 +57,16 @@ jobs:
         run: |
           start=$(date +%s)
           git clone "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" roap-cold
+          # A fork PR's head commit is not in the base clone; fetch it explicitly.
+          if [ -n "$PR_NUMBER" ]; then
+            git -C roap-cold fetch origin "refs/pull/$PR_NUMBER/head"
+          fi
           git -C roap-cold checkout --detach "$SHA"
           echo "Fresh clone|$(( $(date +%s) - start ))" >> "$RUNNER_TEMP/timings"
         shell: bash
         env:
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: pixi install (empty cache)
         working-directory: roap-cold

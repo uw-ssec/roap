@@ -91,6 +91,9 @@ def test_cold_install_workflow_is_manual_uncached_and_timed():
         "Example pipeline",
     ]
     assert "git clone" in timed[0]
+    # Fork PR heads are not in the base clone, so the PR ref is fetched first.
+    fetch = timed[0].index('fetch origin "refs/pull/$PR_NUMBER/head"')
+    assert fetch < timed[0].index('checkout --detach "$SHA"')
     assert "pixi install" in timed[1]
     assert "pixi run pipeline examples/example_data.xlsx outputs/test" in timed[2]
 
