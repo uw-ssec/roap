@@ -1,5 +1,11 @@
 ## 2026-10-26
 
+- **Update**: Linked `decisions/engineering-decisions.md` to
+  `decisions/portable-notebook-defaults.md` (P1 notebook defaults and
+  live-reference cleanup follow the existing package rename and shared-engine
+  decisions.).
+- **Creation**: Documented concept `decisions/portable-notebook-defaults.md`
+  (Portable notebook defaults and live package references).
 - **Creation**: Documented concept `decisions/invariant-test-comparison.md`
   (Invariant tests compare each stage with its own input, as exact text).
 - **Creation**: Documented concept `decisions/automated-pypi-publishing.md`

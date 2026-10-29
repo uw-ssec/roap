@@ -1,7 +1,7 @@
 """
 tests/test_coalesce.py
 ======================
-Tests for oa_pipeline.common coalescing helpers.
+Tests for roap.common coalescing helpers.
 
 The coalescing helpers implement SQL style COALESCE behaviour plus row level
 provenance. For each row, they walk candidate columns in priority order, choose

@@ -91,7 +91,7 @@ units:
 # Human readable source names mapped to current pipeline canonical names
 # ---------------------------------------------------------------------
 # The left hand side reflects common cruise spreadsheet language.
-# The right hand side reflects the current oa_pipeline canonical fields.
+# The right hand side reflects the current roap canonical fields.
 
 pipeline_key_mapping:
   station_id: station_id

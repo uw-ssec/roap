@@ -33,7 +33,7 @@ no application code — it serves as a starting point for new projects.
 │   ├── dependabot.yml           # Dependabot config for GitHub Actions
 │   ├── pull_request_template.md # PR template (requires pre-commit checks)
 │   ├── release.yml              # Release notes configuration
-│   ├── workflows/               # GitHub Actions (zizmor workflow linting, Copilot agent setup)
+│   ├── workflows/               # GitHub Actions (CI, PyPI publishing, zizmor workflow linting, Copilot agent setup)
 │   └── ISSUE_TEMPLATE/          # Issue templates (bug, feature, docs, onboard, etc.)
 ├── .pre-commit-config.yaml      # Pre-commit hook configuration
 ├── knowledge/                   # OKF v0.2 agent-memory bundle (index.md, log.md, concepts)
@@ -55,6 +55,13 @@ no application code — it serves as a starting point for new projects.
 [zizmor](https://github.com/zizmorcore/zizmor) static analysis to lint workflow
 files for security issues. Changes to anything under `.github/workflows/` must
 keep this check passing.
+
+**Publishing:** `.github/workflows/publish.yml` builds the sdist and wheel in
+the `build` Pixi environment. A push to `main` stamps a CalVer dev version
+(`YYYY.0M.MICRO.devN`, from `tools/release_version.py`) and uploads to TestPyPI.
+A published GitHub Release checks that the tag equals `v` + the `pyproject.toml`
+version and uploads to PyPI. Both use PyPI trusted publishing through the
+`testpypi` and `pypi` environments; no tokens are stored in the repository.
 
 **Copilot cloud agent:** `.github/workflows/copilot-setup-steps.yml` prepares
 the GitHub Copilot coding agent's environment (pixi install from `pixi.lock`,

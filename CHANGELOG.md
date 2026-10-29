@@ -6,12 +6,29 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ## [Unreleased]
 
+### Added
+
+- Automated publishing: every merge to `main` uploads a CalVer dev build
+  (`YYYY.0M.MICRO.devN`) to TestPyPI, and a published GitHub Release uploads the
+  release to PyPI (trusted publishing, no stored tokens)
+
 ### Changed
 
 - Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`; the first CalVer
   release will be tagged `v2026.11.0` or later
 - Config compatibility gate compares every version component, so CalVer releases
   and same-month MICRO releases order correctly
+
+### Fixed
+
+- Desktop launcher: Cancel, Quit and closing the window now stop the whole
+  pipeline process tree, including the Jupyter kernel, instead of leaving
+  papermill running in the background, and force-stop anything still running 5
+  seconds later; quitting mid-run asks first
+- Desktop launcher: a cancelled run is reported as having incomplete outputs
+  that must not be used
+- Desktop launcher: the output folder is no longer created when input validation
+  fails
 
 ## [0.2.0] - 2026-10-11
 

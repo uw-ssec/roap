@@ -10,6 +10,7 @@ version = "0.1.0" # Project version
 [environments]
 default = { features = ["pre-commit", "gh-cli", "okf"], solve-group = "default" } # The default development environment with pre-commit, GitHub CLI, and OKF agent memory
 onboard = { features = ["pre-commit", "gh-cli", "onboard"], solve-group = "default" } # The onboarding environment with additional setup tasks
+build = { features = ["build"], no-default-feature = true } # Minimal environment for building the sdist and wheel (used by the publish workflow)
 
 # The project dependencies
 [dependencies]
@@ -33,6 +34,7 @@ ruff = ">=0.5.0,<1.0"
 black = ">=24.0,<25.0"
 mypy = ">=1.10,<2.0"
 typer = ">=0.12,<1.0"
+jupyterlab = ">=4,<5"
 
 # The project dependencies from PyPI
 [pypi-dependencies]
@@ -80,3 +82,14 @@ onboard = { cmd = "ssec onboard", description = "Run the onboarding process for 
     "pre-commit-install",
     "ssec-setup",
 ] }
+
+# Build feature for packaging roap; used by .github/workflows/publish.yml
+[feature.build.dependencies]
+python = ">=3.11,<3.12"
+python-build = ">=1.2"
+setuptools = ">=64"
+wheel = "*"
+twine = ">=6.0"
+
+[feature.build.tasks]
+build-dist = { cmd = "rm -rf dist && python -m build --no-isolation && twine check --strict dist/*", description = "Build and check the sdist and wheel into dist/" }

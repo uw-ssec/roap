@@ -13,6 +13,10 @@
   manual PyPI, CI strategy, single engine, Frontiers 2021, invariant tests,
   config gate
 
+* [Portable notebook defaults and live package references](portable-notebook-defaults.md) -
+  P1 notebooks use repository-local inputs while Papermill overrides and
+  historical prototype references remain intact.
+
 * [Invariant tests compare each stage with its own input, as exact text](invariant-test-comparison.md) -
   Untouched columns keep exact text; serialisation-only equivalence only for
   named numeric and timestamp columns.
