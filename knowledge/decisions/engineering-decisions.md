@@ -120,6 +120,10 @@ PyPI org/project creation needed; configure trusted publishing post-v1.0.0.
 **Follow-up**: Create PyPI org, enable trusted publishing, automate via GitHub
 Actions. **Decider**: Lead ⏳ **Implemented in**: v1.0.0 release (Week 12)
 
+**Update (2026-10-26)**: Automated trusted publishing replaces the manual
+workflow; see
+[Automated publishing to TestPyPI and PyPI](automated-pypi-publishing.md).
+
 ---
 
 ## 6. Cross-Platform CI Strategy (from PRD constraints)
@@ -154,6 +158,10 @@ if any. **Decider**: ADR-0009 ✅ **Implemented in**: P2 (Week 7-9),
 **Decision**: Per-stage invariant test in CI — snapshot input columns → run
 stage → assert untargeted columns byte-identical. **Decider**: Council review ✅
 **Implemented in**: P0 (Week 3-4), `tests/test_invariants.py`
+
+**Refinement (2026-10-26)**: Each stage is compared with its own input file.
+Untouched columns must keep exact text, except named numeric/timestamp columns;
+see [Invariant test comparison](invariant-test-comparison.md).
 
 ---
 
