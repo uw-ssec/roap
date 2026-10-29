@@ -15,9 +15,9 @@ def test_ci_workflow_exists_and_valid():
     matrix = workflow["jobs"]["test"]["strategy"]["matrix"]
     assert "os" in matrix
     assert set(matrix["os"]) == {
-        "blacksmith-4vcpu-ubuntu-2404",
+        "blacksmith-2vcpu-ubuntu-2404",
         "blacksmith-6vcpu-macos-15",
-        "blacksmith-4vcpu-windows-2025",
+        "blacksmith-2vcpu-windows-2025",
     }
 
     # Python 3.11
