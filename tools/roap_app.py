@@ -63,6 +63,8 @@ from roap_app_core import (  # noqa: E402
     find_python,
     kernel_available,
     package_importable,
+    process_group_kwargs,
+    stop_process_tree,
     summarize_verdicts,
 )
 
@@ -83,6 +85,8 @@ class PipelineApp:
         self.bash_exe = find_bash()
         self.python_exe = find_python()
         self.proc: subprocess.Popen | None = None
+        self.cancelled = False
+        self.run_out_dir: Path | None = None
         self.log_queue: "queue.Queue[str]" = queue.Queue()
 
         self.xlsx_var = tk.StringVar()
@@ -98,6 +102,7 @@ class PipelineApp:
         self._build_widgets()
         self._prefill_defaults()
         self._check_environment()
+        self.root.protocol("WM_DELETE_WINDOW", self._quit)
         self.root.after(100, self._drain_log)
 
     # -- layout --------------------------------------------------------------
@@ -190,7 +195,7 @@ class PipelineApp:
         ttk.Button(
             btns, text="Open output folder", command=self._open_output
         ).pack(side="left", padx=4)
-        ttk.Button(btns, text="Quit", command=self.root.destroy).pack(
+        ttk.Button(btns, text="Quit", command=self._quit).pack(
             side="right", padx=4
         )
 
@@ -307,7 +312,7 @@ class PipelineApp:
             messagebox.showerror(APP_TITLE, f"Workbook not found:\n{xlsx}")
             return
         out_dir = Path(self.out_var.get()).expanduser()
-        out_dir.mkdir(parents=True, exist_ok=True)
+        dry_run = self.dry_run_var.get()
 
         config_dir: Path | None = None
         if self.use_config_var.get():
@@ -320,6 +325,9 @@ class PipelineApp:
                     )
                     return
 
+        if not dry_run:
+            out_dir.mkdir(parents=True, exist_ok=True)
+
         cmd = build_command(
             self.bash_exe,
             self.project_root,
@@ -329,9 +337,30 @@ class PipelineApp:
             self.no_parquet_var.get(),
             self.viewer_var.get(),
             self.review_var.get(),
-            self.dry_run_var.get(),
+            dry_run,
             config_dir=config_dir,
         )
+
+        env = dict(os.environ)
+        env["PYTHON_BIN"] = self.python_exe
+        try:
+            # Started here, not in the worker, so Cancel/Quit always see it.
+            self.proc = subprocess.Popen(
+                cmd,
+                cwd=str(self.project_root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                env=env,
+                **process_group_kwargs(),
+            )
+        except Exception as exc:
+            messagebox.showerror(APP_TITLE, f"Could not start the pipeline:\n{exc}")
+            return
+        proc = self.proc
+        self.cancelled = False
+        self.run_out_dir = out_dir
 
         self.run_btn.configure(state="disabled")
         self.cancel_btn.configure(state="normal")
@@ -339,26 +368,18 @@ class PipelineApp:
         self.status_var.set("Running… this can take a minute or two.")
         self._append("\n" + "=" * 64 + "\nRunning:\n  " + " ".join(cmd) + "\n\n")
 
-        env = dict(os.environ)
-        env["PYTHON_BIN"] = self.python_exe
-
+        # The worker must not touch Tk variables: only the main thread may.
         def worker() -> None:
             try:
-                self.proc = subprocess.Popen(
-                    cmd,
-                    cwd=str(self.project_root),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    env=env,
-                )
-                assert self.proc.stdout is not None
-                for line in self.proc.stdout:
+                assert proc.stdout is not None
+                for line in proc.stdout:
                     self.log_queue.put(line)
-                code = self.proc.wait()
+                code = proc.wait()
                 self.log_queue.put(f"\n[exit code {code}]\n")
-                if code == 0 and not self.dry_run_var.get():
+                if self.cancelled:
+                    self.log_queue.put("__DONE_CANCELLED__\n")
+                    return
+                if code == 0 and not dry_run:
                     self.log_queue.put(
                         "\n" + summarize_verdicts(out_dir) + "\n"
                     )
@@ -370,10 +391,26 @@ class PipelineApp:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _running(self) -> bool:
+        return self.proc is not None and self.proc.poll() is None
+
     def _cancel(self) -> None:
-        if self.proc and self.proc.poll() is None:
-            self.proc.terminate()
+        if self._running():
+            self.cancelled = True
+            stop_process_tree(self.proc)
             self._append("\nCancellation requested…\n")
+
+    def _quit(self) -> None:
+        if self._running():
+            if not messagebox.askyesno(
+                APP_TITLE,
+                "The pipeline is still running.\n\n"
+                "Stop it and quit? Outputs from this run will be incomplete.",
+            ):
+                return
+            self.cancelled = True
+            stop_process_tree(self.proc)
+        self.root.destroy()
 
     def _drain_log(self) -> None:
         try:
@@ -383,6 +420,8 @@ class PipelineApp:
                     self._finish(True)
                 elif line == "__DONE_FAIL__\n":
                     self._finish(False)
+                elif line == "__DONE_CANCELLED__\n":
+                    self._finish_cancelled()
                 else:
                     self._append(line)
         except queue.Empty:
@@ -394,6 +433,17 @@ class PipelineApp:
         self.run_btn.configure(state="normal")
         self.cancel_btn.configure(state="disabled")
         self.status_var.set("Done." if ok else "Finished with errors — see log.")
+
+    def _finish_cancelled(self) -> None:
+        # A stage killed mid-write can leave truncated CSV/Parquet files that
+        # look complete, so say so loudly rather than guessing what to delete.
+        self._finish(False)
+        warning = (
+            f"Cancelled. Outputs in {self.run_out_dir} are incomplete "
+            "and must not be used."
+        )
+        self.status_var.set(warning)
+        self._append(f"\n{warning}\n")
 
 
 def main() -> None:
