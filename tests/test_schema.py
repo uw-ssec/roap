@@ -1,7 +1,7 @@
 """
 tests/test_schema.py
 ====================
-Tests for oa_pipeline.schema.
+Tests for roap.schema.
 
 These tests cover canonical alias resolution, row wise alias coalescing,
 duplicate key selection, duplicate flags, schema config loading, and unit or

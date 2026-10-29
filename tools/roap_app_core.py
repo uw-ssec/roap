@@ -1,19 +1,22 @@
 """
-oa_pipeline_app_core.py — GUI-independent logic for the desktop launcher
+roap_app_core.py — GUI-independent logic for the desktop launcher
 ========================================================================
 
 These functions contain all the real behaviour of the desktop app (project
 discovery, command building, environment checks, verdict summarising) with no
 dependency on Tkinter, so they can be unit-tested in a headless environment and
-reused by any front end. `oa_pipeline_app.py` imports from here.
+reused by any front end. `roap_app.py` imports from here.
 """
 
 from __future__ import annotations
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 
@@ -96,6 +99,123 @@ def kernel_available(python_exe: str) -> bool:
         return False
 
 
+def process_group_kwargs() -> dict:
+    """Popen kwargs that start the pipeline as the leader of its own group.
+
+    Cancel and Quit then stop bash *and* everything it launched, instead of
+    only bash (which used to leave papermill running, reparented to init).
+    """
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _posix_descendants(pid: int) -> list[int]:
+    """PIDs of every live descendant of `pid`, from one `ps` snapshot."""
+    try:
+        out = subprocess.run(
+            ["ps", "-A", "-o", "pid=", "-o", "ppid="],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+    except Exception:
+        return []
+    children: dict[int, list[int]] = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            children.setdefault(int(parts[1]), []).append(int(parts[0]))
+    found: list[int] = []
+    stack = [pid]
+    while stack:
+        for child in children.get(stack.pop(), []):
+            found.append(child)
+            stack.append(child)
+    return found
+
+
+# How long a stopped run gets to exit on SIGTERM before it is SIGKILLed.
+STOP_GRACE_SECONDS = 5.0
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _signal_tree(pgid: int, pids: list[int], sig: int) -> None:
+    try:
+        os.killpg(pgid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+    for pid in pids:
+        try:
+            os.kill(pid, sig)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def _escalate(proc: subprocess.Popen, pids: list[int], grace: float) -> None:
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        # The group check catches members born after the descendant snapshot,
+        # e.g. started by a SIGTERM handler; the PID list catches the ones that
+        # left the group (Jupyter kernels).
+        if (
+            proc.poll() is not None
+            and not _group_alive(proc.pid)
+            and not any(_pid_alive(p) for p in pids)
+        ):
+            return
+        time.sleep(0.1)
+    _signal_tree(proc.pid, [p for p in pids if _pid_alive(p)], signal.SIGKILL)
+
+
+def stop_process_tree(proc: subprocess.Popen) -> threading.Thread | None:
+    """Terminate a process started with `process_group_kwargs` and its tree.
+
+    POSIX: SIGTERM the whole process group, plus any descendant that left it.
+    Jupyter starts each kernel in its own session, so killing the group alone
+    would leave the kernel executing a notebook cell until it noticed its
+    parent was gone. Anything still alive after `STOP_GRACE_SECONDS` gets
+    SIGKILL. That wait runs on a returned non-daemon thread, so it never blocks
+    Tk and still finishes if the app quits meanwhile. The PIDs are captured
+    up front because detached descendants are untraceable once bash exits.
+    Windows: `taskkill /T /F` walks the tree by parent PID and kills outright.
+    """
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+            capture_output=True,
+        )
+        return None
+    descendants = _posix_descendants(proc.pid)
+    _signal_tree(proc.pid, descendants, signal.SIGTERM)
+    escalation = threading.Thread(
+        target=_escalate,
+        args=(proc, descendants, STOP_GRACE_SECONDS),
+        daemon=False,
+    )
+    escalation.start()
+    return escalation
+
+
 def to_bash_path(p: Path, bash_exe: str | None = None) -> str:
     """Normalize a path so BOTH bash and Windows Python accept it.
 
@@ -165,7 +285,8 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not project_root:
         problems.append(
             "Could not find the project root (run_pipeline.sh + notebooks/). "
-            "Place the app in the project folder."
+            "Keep tools/roap_app.py in the repository and launch it from "
+            "the repository root with pixi run python tools/roap_app.py."
         )
         return problems
     if not bash_exe:
@@ -176,13 +297,13 @@ def environment_problems(project_root: Path | None, bash_exe: str | None,
     if not package_importable(python_exe):
         problems.append(
             f"roap is not importable by {python_exe}. "
-            'Run: pip install -e ".[dev]"'
+            "From the repository root, run pixi install, then "
+            "pixi run python tools/roap_app.py."
         )
     if not kernel_available(python_exe):
         problems.append(
-            "No Jupyter 'python3' kernel detected. Run: "
-            f"{python_exe} -m pip install ipykernel && "
-            f"{python_exe} -m ipykernel install --user --name python3"
+            "No Jupyter 'python3' kernel detected. From the repository root, "
+            "run pixi install, then pixi run python tools/roap_app.py."
         )
     return problems
 

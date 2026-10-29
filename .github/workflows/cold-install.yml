@@ -1,0 +1,120 @@
+name: Cold install
+
+# Measures the North Star from #12: a fresh clone, `pixi install` with an
+# empty Pixi cache, then the example pipeline, in under 10 minutes on each OS.
+# Each step is timed separately. Unlike ci.yml, nothing here is cached.
+# Run it by hand from the Actions tab. It also runs on pull requests that
+# change this file, so edits to the measurement are measured.
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/cold-install.yml"
+
+permissions: {}
+
+jobs:
+  cold-install:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        os:
+          [
+            blacksmith-4vcpu-ubuntu-2404,
+            blacksmith-6vcpu-macos-15,
+            blacksmith-4vcpu-windows-2025,
+          ]
+      fail-fast: false
+    timeout-minutes: 30
+    env:
+      BUDGET_SECONDS: "600"
+
+    steps:
+      - name: Install Pixi (no install, no cache)
+        uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
+        with:
+          pixi-version: "latest"
+          run-install: false
+          cache: false
+
+      - name: Point the Pixi cache at an empty directory
+        run: |
+          cache="$RUNNER_TEMP/pixi-cold-cache"
+          if [ -e "$cache" ]; then
+            echo "::error::$cache already exists; the run would not be cold"
+            exit 1
+          fi
+          echo "PIXI_CACHE_DIR=$cache" >> "$GITHUB_ENV"
+          echo "RATTLER_CACHE_DIR=$cache" >> "$GITHUB_ENV"
+          : > "$RUNNER_TEMP/timings"
+          pixi --version
+        shell: bash
+
+      - name: Fresh clone
+        run: |
+          start=$(date +%s)
+          git clone "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" roap-cold
+          # A fork PR's head commit is not in the base clone; fetch it explicitly.
+          if [ -n "$PR_NUMBER" ]; then
+            git -C roap-cold fetch origin "refs/pull/$PR_NUMBER/head"
+          fi
+          git -C roap-cold checkout --detach "$SHA"
+          echo "Fresh clone|$(( $(date +%s) - start ))" >> "$RUNNER_TEMP/timings"
+        shell: bash
+        env:
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: pixi install (empty cache)
+        working-directory: roap-cold
+        run: |
+          start=$(date +%s)
+          pixi install
+          echo "pixi install|$(( $(date +%s) - start ))" >> "$RUNNER_TEMP/timings"
+          du -sh "$PIXI_CACHE_DIR"
+        shell: bash
+
+      - name: Example pipeline
+        working-directory: roap-cold
+        run: |
+          start=$(date +%s)
+          pixi run pipeline examples/example_data.xlsx outputs/test
+          echo "Example pipeline|$(( $(date +%s) - start ))" >> "$RUNNER_TEMP/timings"
+          test -s outputs/test/oa_stage4_outputs/data/analysis_ready.csv
+        shell: bash
+
+      - name: Check timings against the 10-minute budget
+        if: always()
+        run: |
+          # Sum outside the `{ ... } | tee` group: that runs in a subshell.
+          total=0
+          while IFS='|' read -r _ seconds; do
+            total=$(( total + seconds ))
+          done < "$RUNNER_TEMP/timings"
+          {
+            echo "### Cold install on $RUNNER_LABEL"
+            echo
+            echo "| Step | Seconds |"
+            echo "| --- | ---: |"
+            while IFS='|' read -r step seconds; do
+              echo "| $step | $seconds |"
+            done < "$RUNNER_TEMP/timings"
+            echo "| **Total** | **$total** |"
+            echo
+            echo "Budget: $BUDGET_SECONDS s."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          steps=$(( $(wc -l < "$RUNNER_TEMP/timings") ))
+          if [ "$steps" -ne 3 ]; then
+            echo "::error::Only $steps of 3 steps finished"
+            exit 1
+          fi
+          if [ "$total" -gt "$BUDGET_SECONDS" ]; then
+            echo "::error::Cold install took $total s, over the $BUDGET_SECONDS s budget"
+            exit 1
+          fi
+        shell: bash
+        env:
+          RUNNER_LABEL: ${{ matrix.os }}

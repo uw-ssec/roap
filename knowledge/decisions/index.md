@@ -13,6 +13,10 @@
   manual PyPI, CI strategy, single engine, Frontiers 2021, invariant tests,
   config gate
 
+* [Portable notebook defaults and live package references](portable-notebook-defaults.md) -
+  P1 notebooks use repository-local inputs while Papermill overrides and
+  historical prototype references remain intact.
+
 * [GUI Cancel and Quit stop the whole pipeline process tree](gui-cancel-stops-process-tree.md) -
   Process-group launch, detached-descendant sweep, SIGKILL after 5 s; cancelled
   runs are flagged incomplete, not deleted.

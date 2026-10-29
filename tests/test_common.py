@@ -1,7 +1,7 @@
 """
 tests/test_common.py
 ====================
-Focused unit tests for oa_pipeline.common.
+Focused unit tests for roap.common.
 
 These tests protect shared behaviours used across the notebook runner and the
 stage modules:

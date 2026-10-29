@@ -1,7 +1,7 @@
 """
 tests/test_inspect.py
 =====================
-Focused unit tests for oa_pipeline.inspect.
+Focused unit tests for roap.inspect.
 
 These tests protect Notebook 03 helper behaviour:
 

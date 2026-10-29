@@ -3,7 +3,7 @@ tests/test_qc_ta_ph.py
 ======================
 Focused unit tests for TA CRM and pH standard QC helpers.
 
-These tests protect the scientific behaviour of oa_pipeline.qc_ta_ph:
+These tests protect the scientific behaviour of roap.qc_ta_ph:
 
 1. TA SOP status mapping.
 2. pH standard table interpolation and out of range handling.
