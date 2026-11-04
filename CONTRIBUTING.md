@@ -1,8 +1,8 @@
-# Contributing to [REPOSITORY NAME]
+# Contributing to ROAP
 
-Thank you for your interest in contributing to **[REPOSITORY NAME]**! This guide
-provides step-by-step instructions to set up the project locally. Follow these
-guidelines to get started.
+Thank you for your interest in contributing to **ROAP**! This guide provides
+step-by-step instructions to set up the project locally. Follow these guidelines
+to get started.
 
 Read our
 [Code of Conduct](https://github.com/uw-ssec/code-of-conduct/blob/main/CODE_OF_CONDUCT.md)

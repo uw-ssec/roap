@@ -105,3 +105,14 @@ Running on `examples/example_data.xlsx` produces **4 non-PASS** verdicts in
 - `pixi run pre-commit-all` — Quality gate (ruff, black, mypy, pytest)
 - `pixi run pytest tests/test_invariants.py -v` — Invariant test only
 - See `CONTRIBUTING.md` for contribution discipline
+
+## Citation
+
+If you use ROAP in your research, please cite it. The citation metadata is in
+[`CITATION.cff`](CITATION.cff), and GitHub's "Cite this repository" button
+generates APA and BibTeX from it.
+
+## Support
+
+See [SUPPORT.md](SUPPORT.md) for where to ask questions, report bugs and raise
+security concerns.
