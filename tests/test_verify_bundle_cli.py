@@ -137,3 +137,46 @@ def test_verify_bundle_cli_unreadable_file_json(tmp_path):
     assert "PermissionError" in by_kind["input"]["reason"]
     assert by_kind["config"]["status"] == "ok"
     assert by_kind["output"]["status"] == "mismatch"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="chmod 000 does not block access on Windows")
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores file permissions")
+def test_verify_bundle_cli_inaccessible_parent_dir_json(tmp_path):
+    """A recorded file under an inaccessible directory is reported, and checking continues."""
+    run_dir, input_xlsx, _, output_csv = _make_bundle(tmp_path)
+    input_xlsx.write_bytes(b"tampered")
+    data_dir = output_csv.parent
+    data_dir.chmod(0)
+    try:
+        result = _verify(run_dir, "--json")
+    finally:
+        data_dir.chmod(stat.S_IRWXU)
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    report = json.loads(result.stdout)
+    assert report["error"] is None
+    by_kind = {c["kind"]: c for c in report["checks"]}
+    assert by_kind["input"]["status"] == "mismatch"
+    assert by_kind["config"]["status"] == "ok"
+    assert by_kind["output"]["status"] == "unreadable"
+    assert "PermissionError" in by_kind["output"]["reason"]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="chmod 000 does not block access on Windows")
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores file permissions")
+def test_verify_bundle_cli_untraversable_run_dir_json(tmp_path):
+    """A readable but untraversable run directory (0400) gives a JSON error report."""
+    run_dir, *_ = _make_bundle(tmp_path)
+    run_dir.chmod(stat.S_IRUSR)
+    try:
+        result = _verify(run_dir, "--json")
+    finally:
+        run_dir.chmod(stat.S_IRWXU)
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    report = json.loads(result.stdout)
+    assert report["valid"] is False
+    assert "PermissionError" in report["error"]
+    assert report["checks"] == []

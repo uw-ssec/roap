@@ -126,10 +126,10 @@ def check_bundle(run_dir: Path) -> Dict[str, Any]:
     manifest_path = run_dir / "run_bundle_manifest.json"
     report: Dict[str, Any] = {"valid": False, "manifest": str(manifest_path), "error": None, "checks": []}
 
-    if not manifest_path.is_file():
-        report["error"] = f"Manifest not found: {manifest_path}"
-        return report
     try:
+        if not manifest_path.is_file():
+            report["error"] = f"Manifest not found: {manifest_path}"
+            return report
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         entries = [("input", manifest["input_file"])]
         entries += [("config", cfg) for cfg in manifest.get("config_files", [])]
@@ -142,15 +142,16 @@ def check_bundle(run_dir: Path) -> Dict[str, Any]:
     for kind, path, expected in records:
         actual: Optional[str] = None
         reason: Optional[str] = None
-        if not path.is_file():
-            status = "missing"
-        else:
-            try:
-                actual = compute_file_hash(path)
-            except OSError as e:
-                status, reason = "unreadable", repr(e)
+        # is_file() can raise too (e.g. PermissionError on an inaccessible
+        # parent directory), so it sits inside the handler with the read.
+        try:
+            if not path.is_file():
+                status = "missing"
             else:
+                actual = compute_file_hash(path)
                 status = "ok" if actual == expected else "mismatch"
+        except OSError as e:
+            actual, status, reason = None, "unreadable", repr(e)
         report["checks"].append(
             {
                 "kind": kind,
