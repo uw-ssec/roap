@@ -613,7 +613,7 @@ export OUTPUT_ROOT
 export INPUT_XLSX
 export CONFIG_DIR
 export RUNS_DIR
-GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+export GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 
 "$PYTHON_BIN" -c "
 from roap.bundle import generate_run_bundle_manifest

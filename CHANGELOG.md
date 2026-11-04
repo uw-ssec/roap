@@ -21,6 +21,16 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ### Fixed
 
+- `roap verify-bundle` now checks the SHA256 of the input, config and output
+  files recorded in `run_bundle_manifest.json`, reports each missing or changed
+  file, and exits 1 when any check fails (it was a stub that always exited 0);
+  `--json` prints the per-file report
+- `run_pipeline.sh` now records the git commit in `run_bundle_manifest.json`; it
+  was always `unknown` because `GIT_COMMIT` was never exported
+- A run without `--config-dir` now records the configuration it used in
+  `run_bundle_manifest.json`: each stage's `logs/effective_config.json` and the
+  CRM certified-values YAML that notebook 02 loads. It previously recorded no
+  config files, so a changed config passed `roap verify-bundle`
 - Desktop launcher: Cancel, Quit and closing the window now stop the whole
   pipeline process tree, including the Jupyter kernel, instead of leaving
   papermill running in the background, and force-stop anything still running 5

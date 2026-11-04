@@ -78,35 +78,41 @@ def verify_bundle(
 ) -> None:
     """Verify run bundle integrity.
 
-    Reads run_bundle_manifest.json and verifies:
-    - Input file SHA256 matches
-    - Config SHA256s match
-    - Code version (git sha) matches
-    - Output file hashes match
+    Reads run_bundle_manifest.json and checks the SHA256 of the input file,
+    every config file and every output file it records. Exits 0 when all
+    match, 1 when any file is missing, changed or unreadable, or the manifest is
+    missing or unreadable.
     """
-    manifest_path = run_dir / "run_bundle_manifest.json"
-    if not manifest_path.exists():
-        typer.echo(f"Error: Manifest not found: {manifest_path}", err=True)
+    from .bundle import check_bundle
+
+    report = check_bundle(run_dir)
+    if report["error"]:
+        typer.echo(f"Error: {report['error']}", err=True)
+        if json_output:
+            typer.echo(json.dumps(report, indent=2))
         raise typer.Exit(code=1)
 
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        typer.echo(f"Error parsing manifest: {e}", err=True)
-        raise typer.Exit(code=1)
-
-    # Stage notebooks write the package version under
-    # manifest["package_versions"]["roap"]; accept a flat "roap_version" too so
-    # a future run-bundle manifest can use either shape.
-    _pkg_versions = manifest.get("package_versions") or {}
-    _version = _pkg_versions.get("roap") or manifest.get("roap_version") or "unknown"
-
-    typer.echo(f"Verifying bundle: {run_dir}")
-    typer.echo(f"  Pipeline version: {_version}")
-    typer.echo(f"  Git commit: {manifest.get('git_commit', 'unknown')}")
-    typer.echo(f"  Timestamp: {manifest.get('timestamp', 'unknown')}")
-
-    # TODO: Implement actual verification logic
-    typer.echo("  [STUB] Verification logic not yet implemented")
     if json_output:
-        typer.echo(json.dumps({"status": "stub", "run_dir": str(run_dir), "manifest": manifest}))
+        typer.echo(json.dumps(report, indent=2))
+    else:
+        manifest = json.loads(Path(report["manifest"]).read_text(encoding="utf-8"))
+        # Stage notebooks write the package version under
+        # manifest["package_versions"]["roap"]; accept a flat "roap_version" too so
+        # a future run-bundle manifest can use either shape.
+        _pkg_versions = manifest.get("package_versions") or {}
+        _version = _pkg_versions.get("roap") or manifest.get("roap_version") or "unknown"
+
+        typer.echo(f"Verifying bundle: {run_dir}")
+        typer.echo(f"  Pipeline version: {_version}")
+        typer.echo(f"  Git commit: {manifest.get('git_commit', 'unknown')}")
+        typer.echo(f"  Timestamp: {manifest.get('timestamp', 'unknown')}")
+        for check in report["checks"]:
+            if check["status"] != "ok":
+                detail = f" [{check['reason']}]" if check["reason"] else ""
+                typer.echo(f"  {check['status'].upper()} ({check['kind']}): {check['path']}{detail}")
+        ok = sum(c["status"] == "ok" for c in report["checks"])
+        typer.echo(f"  {ok}/{len(report['checks'])} files match")
+        typer.echo("Bundle OK" if report["valid"] else "Bundle FAILED verification")
+
+    if not report["valid"]:
+        raise typer.Exit(code=1)
