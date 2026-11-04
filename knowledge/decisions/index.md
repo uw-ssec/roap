@@ -17,6 +17,14 @@
   P1 notebooks use repository-local inputs while Papermill overrides and
   historical prototype references remain intact.
 
+* [Invariant tests compare each stage with its own input, as exact text](invariant-test-comparison.md) -
+  Untouched columns keep exact text; serialisation-only equivalence only for
+  named numeric and timestamp columns.
+
+* [Automated publishing to TestPyPI and PyPI with trusted publishing](automated-pypi-publishing.md) -
+  Merges to main publish CalVer dev builds to TestPyPI; GitHub Releases publish
+  to PyPI.
+
 * [GUI Cancel and Quit stop the whole pipeline process tree](gui-cancel-stops-process-tree.md) -
   Process-group launch, detached-descendant sweep, SIGKILL after 5 s; cancelled
   runs are flagged incomplete, not deleted.
