@@ -32,6 +32,10 @@ pixi run jupyter lab notebooks/
 
 Run `01_preview.ipynb` → `08_stage4.ipynb` in order.
 
+Each stage notebook (02, 04–08) writes `run_bundle_manifest.json` into its
+`OUT_DIR`, so a stage run by hand can be checked with
+`pixi run verify-bundle <OUT_DIR>`.
+
 ## Prerequisites
 
 - Pixi (package manager): `curl -fsSL https://pixi.sh/install.sh | bash`

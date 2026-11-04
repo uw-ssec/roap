@@ -14,6 +14,10 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
   (`YYYY.0M.MICRO.devN`) to TestPyPI, and a published GitHub Release uploads the
   release to PyPI (trusted publishing, no stored tokens)
 
+- Each stage notebook (02, 04–08) writes `run_bundle_manifest.json` into its
+  `OUT_DIR`, recording the stage's input, configs and outputs, so a notebook run
+  by hand without `run_pipeline.sh` can be checked with `roap verify-bundle`
+
 ### Changed
 
 - Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`, starting with
@@ -29,6 +33,9 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
   `--json` prints the per-file report
 - `run_pipeline.sh` now records the git commit in `run_bundle_manifest.json`; it
   was always `unknown` because `GIT_COMMIT` was never exported
+- Notebook 02 finds `configs/crm_certified_values.yaml` when run from
+  `notebooks/` (as JupyterLab does); the default path was relative to the
+  working directory, so a direct run failed
 - A run without `--config-dir` now records the configuration it used in
   `run_bundle_manifest.json`: each stage's `logs/effective_config.json` and the
   CRM certified-values YAML that notebook 02 loads. It previously recorded no
