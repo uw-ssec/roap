@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: "ROAP: Reproducible Ocean Acidification Pipeline"
+abstract: >-
+  ROAP is a Python package for quality control and processing of ocean
+  acidification carbonate-chemistry data. It turns bench-sheet Excel workbooks
+  into QC-flagged, reference-material-corrected outputs with reproducible run
+  bundles, through a CLI, a desktop GUI and Jupyter notebooks.
+authors:
+  - family-names: "Mahu"
+    given-names: "Edem"
+    affiliation: "University of Ghana"
+    orcid: "https://orcid.org/0000-0002-0212-8150"
+  - family-names: "Edusei"
+    given-names: "Maurice Oti"
+    orcid: "https://orcid.org/0000-0002-9760-1472"
+  - family-names: "Setiawan"
+    given-names: "Landung"
+    affiliation: "University of Washington eScience Institute"
+    orcid: "https://orcid.org/0000-0002-1624-2667"
+  - family-names: "Rajpura"
+    given-names: "Vraj"
+    affiliation: "University of Washington eScience Institute"
+    orcid: "https://orcid.org/0009-0000-4988-3279"
+version: "2026.11.0"
+date-released: "2026-11-04"
+license: "BSD-3-Clause"
+repository-code: "https://github.com/uw-ssec/roap"
+keywords:
+  - "ocean acidification"
+  - "carbonate chemistry"
+  - "quality control"
+  - "reproducibility"
+  - "marine science"
