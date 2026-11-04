@@ -152,6 +152,28 @@ def test_stage_bundle_leaves_out_files_from_an_earlier_run(tmp_path):
     assert "analysis_ready.parquet" not in _statuses(result)
 
 
+def test_stage_bundle_same_size_rewrite_within_one_mtime_tick(tmp_path):
+    """A same-size rewrite that keeps the old mtime still counts as this run's.
+
+    Linux file timestamps advance in clock ticks of a few ms and FAT/exFAT in
+    2 s, so a quick rewrite can leave inode, size and mtime unchanged; the
+    snapshot's content hash must catch it.
+    """
+    from roap.bundle import generate_stage_bundle_manifest, snapshot_out_dir
+
+    out_dir, input_csv, _ = _make_stage_out(tmp_path)
+    csv = out_dir / "data" / "analysis_ready.csv"
+    before = snapshot_out_dir(out_dir)
+    old = csv.stat()
+    csv.write_text("a,b\n3,4\n", encoding="utf-8")
+    os.utime(csv, ns=(old.st_atime_ns, old.st_mtime_ns))
+    assert (csv.stat().st_ino, csv.stat().st_size, csv.stat().st_mtime_ns) == (old.st_ino, old.st_size, old.st_mtime_ns)
+
+    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, before=before)
+    assert str(csv.resolve()) in {o["path"] for o in manifest["output_files"]}
+    assert str(csv.resolve()) not in manifest["stale_files"]
+
+
 def test_snapshot_out_dir_missing_dir_is_empty(tmp_path):
     from roap.bundle import snapshot_out_dir
 

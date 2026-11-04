@@ -149,24 +149,29 @@ def _is_notebook_file(rel_path: Path) -> bool:
     return rel_path.suffix == ".ipynb" or ".ipynb_checkpoints" in rel_path.parts
 
 
-# A file's identity for snapshot_out_dir: inode, size and mtime in nanoseconds.
-_FileState = tuple[int, int, int]
+# A file's identity for snapshot_out_dir: inode, size, mtime in nanoseconds
+# and SHA-256. The hash matters where mtime is coarse (Linux timestamps can
+# move in clock ticks of several ms, FAT/exFAT in 2 s), so a same-size rewrite
+# may leave inode, size and mtime all unchanged.
+_FileState = tuple[int, int, int, str]
 
 
 def _file_state(path: Path) -> _FileState:
     st = path.stat()
-    return (st.st_ino, st.st_size, st.st_mtime_ns)
+    return (st.st_ino, st.st_size, st.st_mtime_ns, compute_file_hash(path))
 
 
 def snapshot_out_dir(out_dir: Union[str, Path]) -> Dict[str, _FileState]:
     """Record the files already under ``out_dir`` before a stage notebook writes.
 
     Pass the result to ``generate_stage_bundle_manifest(before=...)``. A file
-    that is new, or whose inode, size or nanosecond mtime differs from this
-    snapshot, was written by the current run; one that is unchanged was left
-    by an earlier run. Comparing states rather than a wall-clock cutoff keeps
-    this correct when two runs happen within the same second (for example
-    rerunning cells in a warm Jupyter kernel).
+    that is new, or whose inode, size, nanosecond mtime or content differs
+    from this snapshot, was written by the current run; one that is unchanged
+    was left by an earlier run. Comparing states rather than a wall-clock
+    cutoff keeps this correct when two runs happen within the same second (for
+    example rerunning cells in a warm Jupyter kernel). A file rewritten with
+    identical bytes within one filesystem timestamp tick counts as unchanged,
+    which is harmless: it is listed as stale rather than hashed.
     """
     out_dir = Path(out_dir).resolve()
     if not out_dir.is_dir():
