@@ -17,6 +17,6 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: uw-ssec/.github/.github/workflows/zizmor-lint.yml@main # zizmor: ignore[unpinned-uses] centrally managed org workflow
+    uses: uw-ssec/.github/.github/workflows/zizmor-lint.yml@f75f257476a0ddb8c8626cc3c9b826577e352096 # main (2026-11-04)
     with:
       enforce: false
