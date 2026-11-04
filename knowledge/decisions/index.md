@@ -24,3 +24,11 @@
 * [Automated publishing to TestPyPI and PyPI with trusted publishing](automated-pypi-publishing.md) -
   Merges to main publish CalVer dev builds to TestPyPI; GitHub Releases publish
   to PyPI.
+
+* [GUI Cancel and Quit stop the whole pipeline process tree](gui-cancel-stops-process-tree.md) -
+  Process-group launch, detached-descendant sweep, SIGKILL after 5 s; cancelled
+  runs are flagged incomplete, not deleted.
+
+* [GUI and notebooks launch through Pixi, with JupyterLab locked](pixi-launch-and-jupyterlab.md) -
+  `pixi run` entry points and a locked `jupyterlab` dependency; no pip or system
+  Python in onboarding.
