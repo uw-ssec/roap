@@ -31,3 +31,14 @@ def test_config_gate_orders_calver_after_semver():
     assert _version_satisfies("2026.9.0", "==2026.09.0")  # zero-padding ignored
     assert not _version_satisfies("2026.11.0", ">=2026.11.1")
     assert not _version_satisfies("0.2.0", ">=2026.11.0")
+
+
+def test_pixi_workspace_version_matches_pyproject():
+    """pixi.toml's workspace version tracks the package version in pyproject.toml."""
+    import tomllib
+
+    with open("pyproject.toml", "rb") as f:
+        pyproject_version = tomllib.load(f)["project"]["version"]
+    with open("pixi.toml", "rb") as f:
+        pixi_version = tomllib.load(f)["workspace"]["version"]
+    assert pixi_version == pyproject_version
