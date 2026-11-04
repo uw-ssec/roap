@@ -1,6 +1,5 @@
 import hashlib
 import json
-import math
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -150,13 +149,38 @@ def _is_notebook_file(rel_path: Path) -> bool:
     return rel_path.suffix == ".ipynb" or ".ipynb_checkpoints" in rel_path.parts
 
 
+# A file's identity for snapshot_out_dir: inode, size and mtime in nanoseconds.
+_FileState = tuple[int, int, int]
+
+
+def _file_state(path: Path) -> _FileState:
+    st = path.stat()
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def snapshot_out_dir(out_dir: Union[str, Path]) -> Dict[str, _FileState]:
+    """Record the files already under ``out_dir`` before a stage notebook writes.
+
+    Pass the result to ``generate_stage_bundle_manifest(before=...)``. A file
+    that is new, or whose inode, size or nanosecond mtime differs from this
+    snapshot, was written by the current run; one that is unchanged was left
+    by an earlier run. Comparing states rather than a wall-clock cutoff keeps
+    this correct when two runs happen within the same second (for example
+    rerunning cells in a warm Jupyter kernel).
+    """
+    out_dir = Path(out_dir).resolve()
+    if not out_dir.is_dir():
+        return {}
+    return {str(p.resolve()): _file_state(p) for p in out_dir.rglob("*") if p.is_file()}
+
+
 def generate_stage_bundle_manifest(
     out_dir: Path,
     notebook: str,
     input_file: Path,
     config_files: Iterable[Optional[Union[str, Path]]] = (),
     *,
-    run_started: float,
+    before: Dict[str, _FileState],
 ) -> Dict[str, Any]:
     """Write a run bundle for one stage notebook run, into ``out_dir``.
 
@@ -170,11 +194,11 @@ def generate_stage_bundle_manifest(
     ``_is_notebook_file``). ``None`` entries in
     ``config_files`` (no config file used) are skipped.
 
-    ``run_started`` is the ``time.time()`` at which the notebook run began.
-    Only files under ``out_dir`` modified at or after it belong to this run;
-    older files left there by an earlier run (say Parquet from a run before
-    ``NO_PARQUET=True``) are not hashed, and are listed under
-    ``stale_files`` instead so the analyst can see what was left out.
+    ``before`` is the ``snapshot_out_dir(out_dir)`` taken at the start of the
+    run, before it wrote anything. Only files this run created or rewrote
+    are hashed; files left unchanged from an earlier run (say Parquet from a
+    run before ``NO_PARQUET=True``) are listed under ``stale_files`` instead
+    so the analyst can see what was left out.
     """
     from roap import __version__
 
@@ -182,12 +206,9 @@ def generate_stage_bundle_manifest(
     manifest_path = out_dir / "run_bundle_manifest.json"
 
     config_paths = [Path(p) for p in config_files if p is not None and str(p).strip().lower() not in ("", "none", "null")]
-    # Whole seconds, so a filesystem with coarse mtimes does not drop a file
-    # written in the run's first second.
-    cutoff = math.floor(run_started)
 
     def _from_this_run(path: Path) -> bool:
-        return path.stat().st_mtime >= cutoff
+        return before.get(str(path.resolve())) != _file_state(path)
 
     effective = out_dir / "logs" / "effective_config.json"
     stale_files: list[str] = []

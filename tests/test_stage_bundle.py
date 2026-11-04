@@ -23,8 +23,9 @@ def _statuses(result: subprocess.CompletedProcess) -> dict[str, str]:
     return {Path(c["path"]).name: (c["kind"], c["status"]) for c in report["checks"]}
 
 
-# A run that began well before _make_stage_out wrote its files.
-STARTED = time.time() - 60
+# Snapshot of an OUT_DIR that was empty when the run began: every file in it
+# was written by this run.
+EMPTY: dict = {}
 
 
 def _make_stage_out(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -51,7 +52,7 @@ def test_stage_bundle_records_input_configs_and_outputs(tmp_path):
 
     out_dir, input_csv, config_yaml = _make_stage_out(tmp_path)
     manifest = generate_stage_bundle_manifest(
-        out_dir, notebook="08_stage4", input_file=input_csv, config_files=[config_yaml, None, "None"], run_started=STARTED
+        out_dir, notebook="08_stage4", input_file=input_csv, config_files=[config_yaml, None, "None"], before=EMPTY
     )
 
     assert manifest["scope"] == "stage"
@@ -78,7 +79,7 @@ def test_stage_bundle_detects_changed_and_missing_files(tmp_path):
 
     out_dir, input_csv, config_yaml = _make_stage_out(tmp_path)
     generate_stage_bundle_manifest(
-        out_dir, notebook="08_stage4", input_file=input_csv, config_files=[config_yaml], run_started=STARTED
+        out_dir, notebook="08_stage4", input_file=input_csv, config_files=[config_yaml], before=EMPTY
     )
 
     with (out_dir / "tables" / "range_check_summary.csv").open("a", encoding="utf-8") as f:
@@ -101,7 +102,7 @@ def test_stage_bundle_git_commit_from_env(tmp_path, monkeypatch):
 
     out_dir, input_csv, _ = _make_stage_out(tmp_path)
     monkeypatch.setenv("GIT_COMMIT", "deadbeef")
-    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, run_started=STARTED)
+    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, before=EMPTY)
     assert manifest["git_commit"] == "deadbeef"
 
 
@@ -113,32 +114,48 @@ def test_stage_bundle_skips_notebooks_saved_in_out_dir(tmp_path):
     (out_dir / "08_stage4.run.ipynb").write_text("{}", encoding="utf-8")
     (out_dir / ".ipynb_checkpoints").mkdir()
     (out_dir / ".ipynb_checkpoints" / "08_stage4-checkpoint.ipynb").write_text("{}", encoding="utf-8")
-    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, run_started=STARTED)
+    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, before=EMPTY)
     assert not [o for o in manifest["output_files"] if "ipynb" in o["path"]]
 
 
 def test_stage_bundle_leaves_out_files_from_an_earlier_run(tmp_path):
-    """Files under OUT_DIR older than this run are listed as stale, not hashed."""
-    from roap.bundle import generate_stage_bundle_manifest
+    """Files under OUT_DIR unchanged since the start snapshot are stale, not hashed.
 
-    out_dir, input_csv, _ = _make_stage_out(tmp_path)
+    No sleep and no backdated mtimes: the earlier run's files are written in
+    the same second as this run's, which a wall-clock cutoff gets wrong.
+    """
+    from roap.bundle import generate_stage_bundle_manifest, snapshot_out_dir
+
+    out_dir, input_csv, _ = _make_stage_out(tmp_path)  # the earlier run
     old_parquet = out_dir / "data" / "analysis_ready.parquet"
     old_parquet.write_bytes(b"from an earlier run")
     old_effective = out_dir / "logs" / "effective_config.json"
-    earlier = STARTED - 3600
-    for path in (old_parquet, old_effective):
-        os.utime(path, (earlier, earlier))
 
-    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, run_started=STARTED)
-    recorded = [o["path"] for o in manifest["output_files"]] + [c["path"] for c in manifest["config_files"]]
-    assert str(old_parquet.resolve()) not in recorded
-    assert str(old_effective.resolve()) not in recorded
-    assert manifest["stale_files"] == sorted([str(old_parquet.resolve()), str(old_effective.resolve())])
-    assert str((out_dir / "data" / "analysis_ready.csv").resolve()) in recorded
+    before = snapshot_out_dir(out_dir)
+    # This run rewrites the CSV (same size, so only the mtime differs) and the
+    # report, adds a table, and writes no Parquet or effective config.
+    new_csv = out_dir / "data" / "analysis_ready.csv"
+    new_csv.write_text("a,b\n3,4\n", encoding="utf-8")
+    (out_dir / "reports" / "report.md").write_text("# Stage 4 rerun\n", encoding="utf-8")
+    (out_dir / "tables" / "new_table.csv").write_text("x\n1\n", encoding="utf-8")
+
+    manifest = generate_stage_bundle_manifest(out_dir, notebook="08_stage4", input_file=input_csv, before=before)
+    recorded = {Path(o["path"]).name for o in manifest["output_files"]} | {
+        Path(c["path"]).name for c in manifest["config_files"]
+    }
+    assert recorded == {"analysis_ready.csv", "report.md", "new_table.csv"}
+    stale = {Path(p).name for p in manifest["stale_files"]}
+    assert stale == {"analysis_ready.parquet", "effective_config.json", "range_check_summary.csv", "manifest.json"}
 
     result = _verify(out_dir)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "analysis_ready.parquet" not in _statuses(result)
+
+
+def test_snapshot_out_dir_missing_dir_is_empty(tmp_path):
+    from roap.bundle import snapshot_out_dir
+
+    assert snapshot_out_dir(tmp_path / "not_yet") == {}
 
 
 def _papermill(notebook: str, executed: Path, *params: str) -> subprocess.CompletedProcess:
@@ -167,7 +184,12 @@ def test_notebook_04_rerun_without_parquet_leaves_old_parquet_out(tmp_path):
     parquets = sorted(out_dir.rglob("*.parquet"))
     assert parquets, "first run should write Parquet"
 
-    time.sleep(1.1)  # the second run starts in a later second than the first run's files
+    # Give the old Parquet an mtime later than the second run's start, as a
+    # same-second rerun in a warm kernel can: only an unchanged-file check,
+    # not a wall-clock cutoff, can tell it was left by the first run.
+    future = time.time() + 30
+    for parquet in parquets:
+        os.utime(parquet, (future, future))
     input_csv.write_text(
         "sample_id,sample_date,station_id,ta,ph\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0\n", encoding="utf-8"
     )
@@ -184,6 +206,54 @@ def test_notebook_04_rerun_without_parquet_leaves_old_parquet_out(tmp_path):
         assert str(parquet.resolve()) in manifest["stale_files"]
     assert any(p.endswith(".csv") for p in hashed)
     assert not [p for p in hashed if p.endswith(".ipynb")]
+
+    result = _verify(out_dir)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _replay_code_cells(notebook: str, namespace: dict, **params) -> None:
+    """Run a notebook's code cells in ``namespace``, as a live Jupyter kernel does.
+
+    ``params`` overrides the parameters cell, like Papermill's injected cell.
+    """
+    nb = json.loads((REPO_ROOT / "notebooks" / notebook).read_text(encoding="utf-8"))
+    for cell in nb["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        exec(compile("".join(cell["source"]), notebook, "exec"), namespace)
+        if "parameters" in cell.get("metadata", {}).get("tags", []):
+            namespace.update(params)
+
+
+@pytest.mark.slow
+def test_notebook_04_same_kernel_rerun_leaves_old_parquet_out(tmp_path, monkeypatch, capsys):
+    """Two runs of notebook 04 in one warm kernel, back to back, no sleep.
+
+    Both runs fall in the same second, so a wall-clock cutoff would claim
+    the first run's Parquet for the second run's changed input.
+    """
+    monkeypatch.chdir(REPO_ROOT / "notebooks")
+    monkeypatch.delenv("GIT_COMMIT", raising=False)
+    input_csv = tmp_path / "derived.csv"
+    input_csv.write_text("sample_id,sample_date,station_id,ta,ph\nS001,2024-01-01,ST1,2200,8.0\n", encoding="utf-8")
+    out_dir = tmp_path / "oa_stage1a_outputs"
+    kernel: dict = {"display": lambda *a, **k: None}
+
+    _replay_code_cells("04_stage1a.ipynb", kernel, INPUT_CSV=str(input_csv), OUT_DIR=str(out_dir))
+    parquets = sorted(out_dir.rglob("*.parquet"))
+    assert parquets, "first run should write Parquet"
+    input_csv.write_text(
+        "sample_id,sample_date,station_id,ta,ph\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0\n", encoding="utf-8"
+    )
+    _replay_code_cells("04_stage1a.ipynb", kernel, INPUT_CSV=str(input_csv), OUT_DIR=str(out_dir), NO_PARQUET=True)
+
+    manifest = json.loads((out_dir / "run_bundle_manifest.json").read_text(encoding="utf-8"))
+    hashed = {o["path"] for o in manifest["output_files"]}
+    for parquet in parquets:
+        assert str(parquet.resolve()) not in hashed
+        assert str(parquet.resolve()) in manifest["stale_files"]
+    new_csvs = [p for p in hashed if p.endswith("analysis_ready.csv")]
+    assert new_csvs and "NEW_RUN_ONLY" in Path(new_csvs[0]).read_text(encoding="utf-8")
 
     result = _verify(out_dir)
     assert result.returncode == 0, result.stdout + result.stderr
