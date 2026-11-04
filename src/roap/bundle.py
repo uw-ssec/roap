@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -138,11 +139,24 @@ def _current_git_commit() -> str:
     return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else "unknown"
 
 
+def _is_notebook_file(rel_path: Path) -> bool:
+    """A Jupyter notebook or checkpoint under a stage OUT_DIR.
+
+    No stage writes notebooks as outputs. One found there is the running
+    notebook itself (Papermill or JupyterLab saved it into OUT_DIR), which is
+    saved again after the bundle cell runs, so hashing it would make every
+    such bundle fail verification.
+    """
+    return rel_path.suffix == ".ipynb" or ".ipynb_checkpoints" in rel_path.parts
+
+
 def generate_stage_bundle_manifest(
     out_dir: Path,
     notebook: str,
     input_file: Path,
     config_files: Iterable[Optional[Union[str, Path]]] = (),
+    *,
+    run_started: float,
 ) -> Dict[str, Any]:
     """Write a run bundle for one stage notebook run, into ``out_dir``.
 
@@ -152,8 +166,15 @@ def generate_stage_bundle_manifest(
     ``logs/effective_config.json``) and every file it wrote under
     ``out_dir``. ``logs/`` holds the run's own provenance (the stage
     manifest and audit logs) and is hashed as output too, except the
-    effective config, which is recorded as config. ``None`` entries in
+    effective config, which is recorded as config, and notebooks (see
+    ``_is_notebook_file``). ``None`` entries in
     ``config_files`` (no config file used) are skipped.
+
+    ``run_started`` is the ``time.time()`` at which the notebook run began.
+    Only files under ``out_dir`` modified at or after it belong to this run;
+    older files left there by an earlier run (say Parquet from a run before
+    ``NO_PARQUET=True``) are not hashed, and are listed under
+    ``stale_files`` instead so the analyst can see what was left out.
     """
     from roap import __version__
 
@@ -161,9 +182,20 @@ def generate_stage_bundle_manifest(
     manifest_path = out_dir / "run_bundle_manifest.json"
 
     config_paths = [Path(p) for p in config_files if p is not None and str(p).strip().lower() not in ("", "none", "null")]
+    # Whole seconds, so a filesystem with coarse mtimes does not drop a file
+    # written in the run's first second.
+    cutoff = math.floor(run_started)
+
+    def _from_this_run(path: Path) -> bool:
+        return path.stat().st_mtime >= cutoff
+
     effective = out_dir / "logs" / "effective_config.json"
+    stale_files: list[str] = []
     if effective.is_file():
-        config_paths.append(effective)
+        if _from_this_run(effective):
+            config_paths.append(effective)
+        else:
+            stale_files.append(str(effective))
     recorded_configs: list[Dict[str, str]] = []
     seen: set[Path] = set()
     for cfg_path in config_paths:
@@ -175,8 +207,14 @@ def generate_stage_bundle_manifest(
     output_files: list[Dict[str, str]] = []
     for out_file in sorted(out_dir.rglob("*")):
         resolved = out_file.resolve()
-        if out_file.is_file() and resolved != manifest_path and resolved not in seen:
+        if _is_notebook_file(out_file.relative_to(out_dir)):
+            continue
+        if not out_file.is_file() or resolved == manifest_path or resolved in seen or resolved == effective:
+            continue
+        if _from_this_run(out_file):
             output_files.append({"path": str(resolved), "sha256": compute_file_hash(out_file)})
+        else:
+            stale_files.append(str(resolved))
 
     package_versions: Dict[str, str] = {"roap": __version__}
     try:
@@ -195,6 +233,7 @@ def generate_stage_bundle_manifest(
         "input_file": {"path": str(input_path), "sha256": compute_file_hash(input_path)},
         "config_files": recorded_configs,
         "output_files": output_files,
+        "stale_files": sorted(stale_files),
         "package_versions": package_versions,
     }
     write_manifest(manifest_path, manifest)
