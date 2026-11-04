@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roap"
-version = "0.2.0"
+version = "2026.11.0"
 description = "Reproducible Ocean Acidification Pipeline (ROAP) - ocean acidification quality control and processing platform"
 readme = "README.md"
 license = { file = "LICENSE" }

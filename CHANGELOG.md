@@ -6,6 +6,8 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ## [Unreleased]
 
+## [2026.11.0] - 2026-11-04
+
 ### Added
 
 - Automated publishing: every merge to `main` uploads a CalVer dev build
@@ -14,8 +16,8 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ### Changed
 
-- Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`; the first CalVer
-  release will be tagged `v2026.11.0` or later
+- Versioning switches from SemVer to CalVer `YYYY.0M.MICRO`, starting with
+  `v2026.11.0`
 - Config compatibility gate compares every version component, so CalVer releases
   and same-month MICRO releases order correctly
 
