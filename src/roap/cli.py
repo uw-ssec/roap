@@ -80,7 +80,7 @@ def verify_bundle(
 
     Reads run_bundle_manifest.json and checks the SHA256 of the input file,
     every config file and every output file it records. Exits 0 when all
-    match, 1 when any file is missing or changed, or the manifest is
+    match, 1 when any file is missing, changed or unreadable, or the manifest is
     missing or unreadable.
     """
     from .bundle import check_bundle
@@ -108,7 +108,8 @@ def verify_bundle(
         typer.echo(f"  Timestamp: {manifest.get('timestamp', 'unknown')}")
         for check in report["checks"]:
             if check["status"] != "ok":
-                typer.echo(f"  {check['status'].upper()} ({check['kind']}): {check['path']}")
+                detail = f" [{check['reason']}]" if check["reason"] else ""
+                typer.echo(f"  {check['status'].upper()} ({check['kind']}): {check['path']}{detail}")
         ok = sum(c["status"] == "ok" for c in report["checks"])
         typer.echo(f"  {ok}/{len(report['checks'])} files match")
         typer.echo("Bundle OK" if report["valid"] else "Bundle FAILED verification")

@@ -1,5 +1,7 @@
 # tests/test_verify_bundle_cli.py
 import json
+import os
+import stat
 import subprocess
 from pathlib import Path
 
@@ -95,3 +97,43 @@ def test_verify_bundle_cli_unreadable_manifest(tmp_path):
 
     assert result.returncode == 1
     assert "error" in result.stderr.lower()
+
+
+def test_verify_bundle_cli_non_utf8_manifest_json(tmp_path):
+    """A manifest that is not UTF-8 gives exit 1 and a parseable JSON error report."""
+    run_dir, *_ = _make_bundle(tmp_path)
+    manifest = run_dir / "run_bundle_manifest.json"
+    manifest.write_bytes(b"\xff" + manifest.read_bytes())
+
+    result = _verify(run_dir, "--json")
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    report = json.loads(result.stdout)
+    assert report["valid"] is False
+    assert "Unreadable manifest" in report["error"]
+    assert report["checks"] == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="chmod 000 does not block reads on Windows")
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignores file permissions")
+def test_verify_bundle_cli_unreadable_file_json(tmp_path):
+    """An unreadable recorded file is reported, and the remaining files are still checked."""
+    run_dir, input_xlsx, _, output_csv = _make_bundle(tmp_path)
+    output_csv.write_text("col1,col2\n999,999\n", encoding="utf-8")
+    input_xlsx.chmod(0)
+    try:
+        result = _verify(run_dir, "--json")
+    finally:
+        input_xlsx.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    assert result.returncode == 1
+    assert "Traceback" not in result.stderr
+    report = json.loads(result.stdout)
+    assert report["valid"] is False
+    assert report["error"] is None
+    by_kind = {c["kind"]: c for c in report["checks"]}
+    assert by_kind["input"]["status"] == "unreadable"
+    assert "PermissionError" in by_kind["input"]["reason"]
+    assert by_kind["config"]["status"] == "ok"
+    assert by_kind["output"]["status"] == "mismatch"

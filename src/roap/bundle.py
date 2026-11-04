@@ -16,6 +16,37 @@ def compute_file_hash(path: Path) -> str:
     return h.hexdigest()
 
 
+# Keys in a stage's logs/manifest.json "config" block that name a config file
+# the stage loaded.
+_STAGE_CONFIG_PATH_KEYS = ("config_path", "crm_values_path")
+
+
+def _stage_config_files(search_root: Path) -> list[Path]:
+    """Config files the pipeline stages under ``search_root`` actually used.
+
+    Each stage's ``logs/effective_config.json`` (the resolved settings), and
+    any file a stage's ``logs/manifest.json`` records under ``config`` (for
+    example the CRM certified-values YAML that notebook 02 loads by default).
+    """
+    found: list[Path] = []
+    for logs in sorted(search_root.glob("oa_*_outputs/logs")):
+        effective = logs / "effective_config.json"
+        if effective.is_file():
+            found.append(effective)
+        stage_manifest = logs / "manifest.json"
+        if not stage_manifest.is_file():
+            continue
+        try:
+            config = json.loads(stage_manifest.read_text(encoding="utf-8")).get("config") or {}
+        except (ValueError, OSError, AttributeError):
+            continue
+        for key in _STAGE_CONFIG_PATH_KEYS:
+            value = config.get(key) if isinstance(config, dict) else None
+            if isinstance(value, str) and Path(value).is_file():
+                found.append(Path(value))
+    return found
+
+
 def generate_run_bundle_manifest(
     run_dir: Path,
     input_xlsx: Path,
@@ -34,16 +65,25 @@ def generate_run_bundle_manifest(
     # Input file hash
     input_sha256 = compute_file_hash(input_xlsx)
 
-    # Config files hashes
-    config_files: list[Dict[str, str]] = []
+    search_root = output_root if output_root is not None else run_dir
+
+    # Config files hashes: the --config-dir files, plus what the stages
+    # actually used (see _stage_config_files), so a default run with no
+    # --config-dir still records its configuration.
+    config_paths: list[Path] = []
     if config_dir is not None and config_dir.is_dir():
-        for cfg_path in sorted(config_dir.iterdir()):
-            if cfg_path.is_file():
-                config_files.append({"path": str(cfg_path.resolve()), "sha256": compute_file_hash(cfg_path)})
+        config_paths += [p for p in sorted(config_dir.iterdir()) if p.is_file()]
+    config_paths += _stage_config_files(search_root)
+    config_files: list[Dict[str, str]] = []
+    seen: set[Path] = set()
+    for cfg_path in config_paths:
+        resolved = cfg_path.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            config_files.append({"path": str(resolved), "sha256": compute_file_hash(cfg_path)})
 
     # Output files hashes (from output_root/oa_stage*_outputs/data/ if provided, else run_dir)
     output_files: list[Dict[str, str]] = []
-    search_root = output_root if output_root is not None else run_dir
     for stage_dir in sorted(search_root.glob("oa_stage*_outputs/data")):
         for out_file in sorted(stage_dir.iterdir()):
             if out_file.is_file():
@@ -79,8 +119,9 @@ def check_bundle(run_dir: Path) -> Dict[str, Any]:
     Returns a report dict: ``valid`` (bool), ``manifest`` (path), ``error``
     (str or None, set when the manifest itself is missing or unreadable) and
     ``checks``, one entry per recorded file with ``kind`` (input, config or
-    output), ``path``, ``expected``, ``actual`` and ``status`` (ok, mismatch
-    or missing). Every file is checked, so the report lists all problems.
+    output), ``path``, ``expected``, ``actual``, ``status`` (ok, mismatch,
+    missing or unreadable) and ``reason`` (the read error for unreadable
+    files). Every file is checked, so the report lists all problems.
     """
     manifest_path = run_dir / "run_bundle_manifest.json"
     report: Dict[str, Any] = {"valid": False, "manifest": str(manifest_path), "error": None, "checks": []}
@@ -94,20 +135,31 @@ def check_bundle(run_dir: Path) -> Dict[str, Any]:
         entries += [("config", cfg) for cfg in manifest.get("config_files", [])]
         entries += [("output", out) for out in manifest.get("output_files", [])]
         records = [(kind, Path(entry["path"]), entry["sha256"]) for kind, entry in entries]
-    except (json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+    except (ValueError, OSError, KeyError, TypeError) as e:  # ValueError covers JSON and UTF-8 decode errors
         report["error"] = f"Unreadable manifest {manifest_path}: {e!r}"
         return report
 
     for kind, path, expected in records:
-        actual = compute_file_hash(path) if path.is_file() else None
-        if actual is None:
+        actual: Optional[str] = None
+        reason: Optional[str] = None
+        if not path.is_file():
             status = "missing"
-        elif actual == expected:
-            status = "ok"
         else:
-            status = "mismatch"
+            try:
+                actual = compute_file_hash(path)
+            except OSError as e:
+                status, reason = "unreadable", repr(e)
+            else:
+                status = "ok" if actual == expected else "mismatch"
         report["checks"].append(
-            {"kind": kind, "path": str(path), "expected": expected, "actual": actual, "status": status}
+            {
+                "kind": kind,
+                "path": str(path),
+                "expected": expected,
+                "actual": actual,
+                "status": status,
+                "reason": reason,
+            }
         )
 
     report["valid"] = all(c["status"] == "ok" for c in report["checks"])
