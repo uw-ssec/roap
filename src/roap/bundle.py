@@ -73,41 +73,52 @@ def generate_run_bundle_manifest(
     return manifest
 
 
+def check_bundle(run_dir: Path) -> Dict[str, Any]:
+    """Check every hash recorded in a run bundle manifest.
+
+    Returns a report dict: ``valid`` (bool), ``manifest`` (path), ``error``
+    (str or None, set when the manifest itself is missing or unreadable) and
+    ``checks``, one entry per recorded file with ``kind`` (input, config or
+    output), ``path``, ``expected``, ``actual`` and ``status`` (ok, mismatch
+    or missing). Every file is checked, so the report lists all problems.
+    """
+    manifest_path = run_dir / "run_bundle_manifest.json"
+    report: Dict[str, Any] = {"valid": False, "manifest": str(manifest_path), "error": None, "checks": []}
+
+    if not manifest_path.is_file():
+        report["error"] = f"Manifest not found: {manifest_path}"
+        return report
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entries = [("input", manifest["input_file"])]
+        entries += [("config", cfg) for cfg in manifest.get("config_files", [])]
+        entries += [("output", out) for out in manifest.get("output_files", [])]
+        records = [(kind, Path(entry["path"]), entry["sha256"]) for kind, entry in entries]
+    except (json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+        report["error"] = f"Unreadable manifest {manifest_path}: {e!r}"
+        return report
+
+    for kind, path, expected in records:
+        actual = compute_file_hash(path) if path.is_file() else None
+        if actual is None:
+            status = "missing"
+        elif actual == expected:
+            status = "ok"
+        else:
+            status = "mismatch"
+        report["checks"].append(
+            {"kind": kind, "path": str(path), "expected": expected, "actual": actual, "status": status}
+        )
+
+    report["valid"] = all(c["status"] == "ok" for c in report["checks"])
+    return report
+
+
 def verify_bundle(run_dir: Path, output_root: Optional[Path] = None) -> bool:
     """Verify a run bundle's integrity.
 
     Returns True if all hashes match the manifest, False otherwise.
+    ``output_root`` is accepted for compatibility; the manifest records
+    absolute paths, so it is not needed.
     """
-    manifest_path = run_dir / "run_bundle_manifest.json"
-    if not manifest_path.exists():
-        return False
-
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return False
-
-    # Verify input file hash
-    input_path = Path(manifest["input_file"]["path"])
-    if not input_path.is_file():
-        return False
-    if compute_file_hash(input_path) != manifest["input_file"]["sha256"]:
-        return False
-
-    # Verify config file hashes
-    for cfg in manifest.get("config_files", []):
-        cfg_path = Path(cfg["path"])
-        if not cfg_path.is_file():
-            return False
-        if compute_file_hash(cfg_path) != cfg["sha256"]:
-            return False
-
-    # Verify output file hashes
-    for out in manifest.get("output_files", []):
-        out_path = Path(out["path"])
-        if not out_path.is_file():
-            return False
-        if compute_file_hash(out_path) != out["sha256"]:
-            return False
-
-    return True
+    return bool(check_bundle(run_dir)["valid"])
