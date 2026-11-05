@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import math
 import os
 import re
 import shutil
@@ -40,8 +41,8 @@ OUTPUT_SUBDIRS = {"data", "tables", "qc"}
 # input paths (source_file, source_file_stage2, ...) and stage timestamps.
 VOLATILE_COLUMN = re.compile(r"^(source_file(_stage\w+)?|stage\w+_processed_utc)$")
 
-# Float comparison tolerance: tight, but allows last-bit differences across
-# platforms in PyCO2SYS and NumPy reductions.
+# Float comparison tolerance, applied only between two FLOAT_TEXT values: tight,
+# but allows last-bit differences across platforms in PyCO2SYS and NumPy.
 RTOL = 1e-9
 ATOL = 1e-12
 
@@ -55,11 +56,24 @@ def output_csvs(out_root: Path) -> list[Path]:
     )
 
 
-def _read(path: Path) -> pd.DataFrame:
-    text = path.read_text(encoding="utf-8")
+# A float as the stages write it: has a decimal point or an exponent. Values
+# without one (batch numbers, station IDs, counts) are compared as exact text.
+FLOAT_TEXT = re.compile(r"^[+-]?(?:(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)$")
+
+
+def _parse(text: str) -> pd.DataFrame:
+    """Every cell as its CSV text: no type inference and no NA parsing.
+
+    Inference would erase identifier changes (``0213`` reads as ``213``) and NA
+    parsing would make a literal ``NA`` equal to an empty cell.
+    """
     if not text.strip():  # stages write a bare newline for an empty table
         return pd.DataFrame()
-    return pd.read_csv(io.StringIO(text), low_memory=False)
+    return pd.read_csv(io.StringIO(text), dtype=str, keep_default_na=False, na_filter=False)
+
+
+def _read(path: Path) -> pd.DataFrame:
+    return _parse(path.read_text(encoding="utf-8"))
 
 
 def normalize(df: pd.DataFrame) -> pd.DataFrame:
@@ -67,7 +81,7 @@ def normalize(df: pd.DataFrame) -> pd.DataFrame:
     out = df.drop(columns=[c for c in df.columns if VOLATILE_COLUMN.match(str(c))])
     if {"column", "example_nonnull"} <= set(out.columns):
         volatile_rows = out["column"].astype(str).str.match(VOLATILE_COLUMN)
-        out.loc[volatile_rows, "example_nonnull"] = None
+        out.loc[volatile_rows, "example_nonnull"] = ""
     return out
 
 
@@ -81,9 +95,38 @@ def canonical_csv(path: Path) -> str:
 
 def load_canonical(text: str) -> pd.DataFrame:
     """Parse baseline CSV text the same way for fixtures and fresh output."""
-    if not text.strip():
-        return pd.DataFrame()
-    return pd.read_csv(io.StringIO(text), low_memory=False)
+    return _parse(text)
+
+
+def _cells_match(actual: str, expected: str) -> bool:
+    """Exact text, except two float-formatted values may differ within tolerance."""
+    if actual == expected:
+        return True
+    if FLOAT_TEXT.match(actual) and FLOAT_TEXT.match(expected):
+        return math.isclose(float(actual), float(expected), rel_tol=RTOL, abs_tol=ATOL)
+    return False
+
+
+def compare_frames(actual: pd.DataFrame, expected: pd.DataFrame) -> list[str]:
+    """Differences between two text-valued frames, one message per column."""
+    if actual.columns.tolist() != expected.columns.tolist():
+        return [f"columns differ: {actual.columns.tolist()} != {expected.columns.tolist()}"]
+    if len(actual) != len(expected):
+        return [f"row count differs: {len(actual)} != {len(expected)}"]
+    problems = []
+    for col in actual.columns:
+        bad = [
+            i
+            for i, (a, e) in enumerate(zip(actual[col], expected[col], strict=True))
+            if not _cells_match(a, e)
+        ]
+        if bad:
+            i = bad[0]
+            problems.append(
+                f"column {col!r}: {len(bad)} row(s) differ, first at row {i}: "
+                f"{actual[col].iloc[i]!r} != baseline {expected[col].iloc[i]!r}"
+            )
+    return problems
 
 
 def run_pipeline(out_root: Path, bash: str = "bash") -> None:
@@ -128,12 +171,7 @@ def compare(out_root: Path, golden_dir: Path = GOLDEN_DIR) -> list[str]:
     for rel in sorted(fresh & golden):
         actual = load_canonical(canonical_csv(out_root / rel))
         expected = load_canonical((golden_dir / rel).read_text(encoding="utf-8"))
-        try:
-            pd.testing.assert_frame_equal(
-                actual, expected, check_exact=False, rtol=RTOL, atol=ATOL
-            )
-        except AssertionError as exc:
-            problems.append(f"{rel.as_posix()}: {exc}")
+        problems += [f"{rel.as_posix()}: {p}" for p in compare_frames(actual, expected)]
     return problems
 
 

@@ -3,9 +3,16 @@
 `example_data/` is the pipeline's output on the synthetic workbook
 `examples/example_data.xlsx` (Stages QC to 4, default configs): every CSV that
 `run_pipeline.sh` writes under a `data/`, `tables/` or `qc/` directory.
-`tests/test_golden_baseline.py` reruns the pipeline and compares each file with
-`pandas.testing.assert_frame_equal` (`rtol=1e-9`, `atol=1e-12`). It also fails
-when a stage writes a new CSV or stops writing one.
+`tests/test_golden_baseline.py` reruns the pipeline and compares each file cell
+by cell as CSV text, with no type inference and no NA parsing, so `0213` differs
+from `213` and a literal `NA` differs from an empty cell. Only two values
+written as floats (with a decimal point or exponent) may differ within
+`rtol=1e-9`, `atol=1e-12`. It also fails when a stage writes a new CSV or stops
+writing one.
+
+`tests/test_no_unpublished_data.py` allows tracked data under `example_data/`
+only at the CSV paths the generator writes
+(`oa_*_outputs/[sheet/]{data,tables,qc}/*.csv`).
 
 Excluded, because they change from run to run or are not deliverables:
 

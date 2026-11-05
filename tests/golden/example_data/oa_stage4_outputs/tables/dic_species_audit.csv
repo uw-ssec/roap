@@ -1,6 +1,6 @@
 dic_best_umol_kg,co2aq_calc_umol_kg,hco3_calc_umol_kg,co3_calc_umol_kg,dic_species_sum,dic_minus_sum,dic_sum_tol,flag_dic_species_audit_not_run,flag_dic_species_values_missing_audit,flag_dic_species_audit_strict,flag_dic_species_unit_mismatch_audit,flag_dic_species_unit_missing_audit,flag_dic_species_nonpositive_dic_audit,flag_dic_species_negative_co2aq_audit,flag_dic_species_negative_hco3_audit,flag_dic_species_negative_co3_audit
 2060.48,17.62,1909.57,133.29,2060.48,0.0,20.6048,False,False,False,False,False,False,False,False,False
-2025.98,19.23,1886.12,120.63,2025.98,0.0,20.2598,False,False,False,False,False,False,False,False,False
+2025.98,19.23,1886.12,120.63,2025.98,0.0,20.259800000000002,False,False,False,False,False,False,False,False,False
 2022.9,22.79,1908.63,91.48,2022.9,0.0,20.229000000000003,False,False,False,False,False,False,False,False,False
 2109.37,18.08,1980.54,110.75,2109.37,0.0,21.0937,False,False,False,False,False,False,False,False,False
 2012.91,10.56,1918.92,83.43,2012.91,0.0,20.1291,False,False,False,False,False,False,False,False,False
@@ -10,13 +10,13 @@ dic_best_umol_kg,co2aq_calc_umol_kg,hco3_calc_umol_kg,co3_calc_umol_kg,dic_speci
 2132.78,24.47,1977.32,130.99,2132.7799999999997,4.547473508864641e-13,21.327800000000003,False,False,False,False,False,False,False,False,False
 2081.97,217.25,1899.33,165.39,2281.97,-200.0,20.819699999999997,False,False,True,False,False,False,False,False,False
 2128.06,14.18,1994.93,118.95,2128.06,0.0,21.2806,False,False,False,False,False,False,False,False,False
-2021.2,18.16,1919.67,83.37,2021.2000000000005,-2.273736754432321e-13,20.212,False,False,False,False,False,False,False,False,False
-1980.87,11.96,1820.55,148.36,1980.87,0.0,19.8087,False,False,False,False,False,False,False,False,False
+2021.2,18.16,1919.67,83.37,2021.2000000000003,-2.2737367544323206e-13,20.212,False,False,False,False,False,False,False,False,False
+1980.87,11.96,1820.55,148.36,1980.87,0.0,19.808699999999998,False,False,False,False,False,False,False,False,False
 2109.02,18.65,1977.78,112.59,2109.02,0.0,21.0902,False,False,False,False,False,False,False,False,False
 2111.79,19.7,-50.0,148.85,118.55,1993.24,21.1179,False,False,True,False,False,False,False,True,False
 2090.22,20.94,1973.22,96.06,2090.2200000000003,-4.547473508864641e-13,20.902199999999997,False,False,False,False,False,False,False,False,False
 2043.1,16.36,1879.09,147.65,2043.1,0.0,20.431,False,False,False,False,False,False,False,False,False
-2014.21,14.12,1881.49,118.6,2014.21,2.273736754432321e-13,20.1421,False,False,False,False,False,False,False,False,False
+2014.21,14.12,1881.49,118.6,2014.2099999999998,2.2737367544323206e-13,20.1421,False,False,False,False,False,False,False,False,False
 2014.46,22.73,1901.03,90.7,2014.46,0.0,20.1446,False,False,False,False,False,False,False,False,False
 2016.45,12.66,1876.61,127.18,2016.45,0.0,20.1645,False,False,False,False,False,False,False,False,False
 ,,,,,,,False,False,False,False,False,False,False,False,False
