@@ -6,6 +6,12 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ## [Unreleased]
 
+### Fixed
+
+- Stage 1B stores `is_sample_row` as a boolean again, so CRM and standard rows
+  are no longer treated as samples and no longer get
+  `flag_core_chemistry_missing` (#47)
+
 ## [2026.11.0] - 2026-11-04
 
 ### Added

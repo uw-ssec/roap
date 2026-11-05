@@ -598,7 +598,9 @@ def add_provenance_fields(
     """Add unit, scale, calculation input, and role provenance in place."""
     meta: Dict[str, Any] = {}
 
-    df["is_sample_row"] = classify_rows_sample(df)
+    # classify_rows_sample returns a "SAMPLE"/"CRM"/"STD" label; readers expect
+    # a boolean, as in the prototype (#47). row_classification keeps the label.
+    df["is_sample_row"] = classify_rows_sample(df).eq("SAMPLE").astype("boolean")
 
     ta_units_cols = existing_columns(df, config.get("ta_unit_candidates", []))
     ta_units_raw, ta_units_source = coalesce_string_series(df, ta_units_cols)
