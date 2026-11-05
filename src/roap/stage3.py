@@ -1204,6 +1204,18 @@ def _complete_group_key(df: pd.DataFrame, keys: Sequence[str]) -> pd.Series:
     return complete
 
 
+def _no_groups(df: pd.DataFrame, keys: Sequence[str], counts: Sequence[str]) -> pd.DataFrame:
+    """A zero-row summary with the key columns (dtypes kept) and count columns.
+
+    Used when no Sample row has a complete group key, so callers can still
+    merge the summary onto the rows on ``keys`` (#44).
+    """
+    qc = df.loc[:, list(keys)].iloc[0:0].copy()
+    for name in counts:
+        qc[name] = pd.Series(dtype="Int64")
+    return qc
+
+
 def build_qc_summary(
     df: pd.DataFrame,
     requested_keys: Sequence[str],
@@ -1226,9 +1238,9 @@ def build_qc_summary(
                     .reset_index()
                 )
                 qc = qc.merge(sizes, on=keys, how="left")
+                qc["n_rows_with_incomplete_group_key"] = int((~complete_key).sum())
             else:
-                qc = pd.DataFrame({"n_rows": [0]})
-            qc["n_rows_with_incomplete_group_key"] = int((~complete_key).sum())
+                qc = _no_groups(df, keys, ["n_rows", "n_rows_with_incomplete_group_key"])
         else:
             qc = pd.DataFrame({"n_rows": [len(df)]})
         return qc, keys
@@ -1241,7 +1253,7 @@ def build_qc_summary(
             qc = df.loc[complete_key].groupby(keys, dropna=False).agg(**agg).reset_index()
             qc["n_rows_with_incomplete_group_key"] = n_incomplete
         else:
-            qc = pd.DataFrame({"n_rows_with_incomplete_group_key": [n_incomplete]})
+            qc = _no_groups(df, keys, [*agg, "n_rows_with_incomplete_group_key"])
     else:
         qc = pd.DataFrame(
             {
@@ -1334,7 +1346,12 @@ def run(
 
     qc_df, keys_used = build_qc_summary(df, config.get("qc_group_keys", []))
     if keys_used:
+        before = set(df.columns)
         df = df.merge(qc_df, on=keys_used, how="left", suffixes=("", "_grp"))
+        # Only Samples are in a group (#44): a CRM or Standard row sharing a
+        # Sample group's keys gets no group counts.
+        group_cols = [f"{c}_grp" if c in before else c for c in qc_df.columns if c not in keys_used]
+        df.loc[~row_roles.is_sample(df), group_cols] = pd.NA
     else:
         for col in qc_df.columns:
             df[col] = qc_df.iloc[0][col]
