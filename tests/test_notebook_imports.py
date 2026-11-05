@@ -65,38 +65,32 @@ def test_no_absolute_user_paths_in_code_cells(nb_path: Path) -> None:
     )
 
 
-def test_stage4_carbonate_import_is_not_swallowed() -> None:
-    """The carbonate_calc import must not sit inside the try/except.
+def test_stage4_carbonate_import_is_not_swallowed(monkeypatch) -> None:
+    """An unimportable carbonate_calc fails Stage 4 instead of being swallowed.
 
-    If it does, a broken install silently yields no chemistry while the
-    pipeline reports success.
+    Stage 4's run() (#42) records carbonate *computation* errors and carries
+    on; if it also swallowed the import, a broken install would silently
+    yield no chemistry while the pipeline reports success.
     """
+    import sys
+
+    import pandas as pd
+
+    import roap
+    from roap import stage4
+    from roap.stage_config import load_stage_config
+
+    monkeypatch.setitem(sys.modules, "roap.carbonate_calc", None)
+    monkeypatch.delattr(roap, "carbonate_calc", raising=False)
+    frame = pd.read_csv(REPO_ROOT / "tests" / "golden" / "example_data" / "oa_stage3_outputs" / "data" / "enhanced.csv")
+
+    with pytest.raises(ImportError):
+        stage4.run(frame, load_stage_config("stage4"), carbonate_calc=True)
+
     nb = json.loads((REPO_ROOT / "notebooks" / "08_stage4.ipynb").read_text(encoding="utf-8"))
-
-    cell_src = None
-    for cell in nb["cells"]:
-        if cell.get("cell_type") != "code":
-            continue
-        src = "".join(cell.get("source", []))
-        if "carbonate_calc" in src and "import" in src:
-            cell_src = src
-            break
-
-    assert cell_src is not None, "Could not find the carbonate_calc cell"
-    assert "from roap import carbonate_calc" in cell_src, (
-        "08_stage4 must import carbonate_calc from roap"
-    )
-
-    lines = cell_src.splitlines()
-    import_idx = next(
-        i for i, ln in enumerate(lines) if "from roap import carbonate_calc" in ln
-    )
-    try_idx = next(
-        (i for i, ln in enumerate(lines) if ln.strip() == "try:" and i > import_idx),
-        None,
-    )
-    assert try_idx is not None and try_idx > import_idx, (
-        "The carbonate_calc import must appear BEFORE the try/except guarding "
-        "the computation, so an unimportable engine fails loudly instead of "
-        "silently producing an analysis_ready.csv with no chemistry."
-    )
+    code = "".join("".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code")
+    assert "carbonate_calc=not NO_CARBONATE_CALC" in code
+    # The cell around stage4.run catches only ValueError, so an ImportError
+    # from run() stops the notebook.
+    run_block = code[code.rindex("try:", 0, code.index("stage4.run(")) : code.index("die(str(exc))")]
+    assert "except ValueError as exc:" in run_block and "except Exception" not in run_block
