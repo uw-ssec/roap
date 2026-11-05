@@ -18,22 +18,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Tuple
 
 import pandas as pd
 
 from . import row_roles
 from .common import (
+    as_bool,
     build_corrections_table,
     die,
     fmt,
+    html_table,
+    is_none_like,
+    normalize_columns,
     resolve_col,
     robust_outlier_flags,
+    safe_sheet_name,
     utc_stamp,
     write_text,
 )
+from .stage_result import StageResult, package_versions
+
+if TYPE_CHECKING:
+    from .stage_config import StageConfig
 
 __all__ = [
+    # Stage run
+    "NOTEBOOK",
+    "QC_RUN_DEFAULTS",
+    "qc_run_parameters",
+    "run",
     # Reference data
     "CRM_CERTIFIED_TA",
     "CRM_REFERENCE_METADATA",
@@ -47,12 +61,16 @@ __all__ = [
     # TA CRM
     "apply_ta_sop_auto_rule",
     "apply_ta_crm_correction",
+    "rm_ta_diff_qc_figure",
+    "ta_markdown_report",
     "write_rm_ta_diff_qc_plot",
     "write_ta_markdown_report",
     # pH standard
     "ph_standard_expected",
     "ph_status_from_mean",
     "apply_ph_standard_qc_and_correction",
+    "phstd_qc_figure",
+    "phstd_markdown_report",
     "write_phstd_qc_plot",
     "write_phstd_markdown_report",
 ]
@@ -756,17 +774,16 @@ def apply_ta_crm_correction(
     return out, crm, corr_table, summary
 
 
-def write_rm_ta_diff_qc_plot(
+def rm_ta_diff_qc_figure(
     crm_qc: pd.DataFrame,
-    out_jpeg: Path,
     sample_tag_col: str,
     sop: TaSop,
     annotate_points: bool = True,
     title: str = "RM Alkalinity Difference",
-) -> bool:
-    """Write a JPEG scatter of analysis number against certified minus measured TA.
+) -> Optional[Any]:
+    """Scatter of analysis number against certified minus measured TA.
 
-    Returns True if a plot was written, False if skipped (no plottable data).
+    Returns the matplotlib Figure, or None when there is nothing to plot.
     """
     try:
         import matplotlib.pyplot as plt
@@ -775,7 +792,7 @@ def write_rm_ta_diff_qc_plot(
 
     if crm_qc.empty:
         print("INFO: no CRM/RM TA rows to plot; skipping TA plot.")
-        return False
+        return None
 
     dfp = crm_qc.copy()
     dfp["ta_diff_umolkg"] = pd.to_numeric(dfp["ta_diff_umolkg"], errors="coerce")
@@ -783,7 +800,7 @@ def write_rm_ta_diff_qc_plot(
 
     if dfp.empty:
         print("INFO: no numeric TA differences to plot; skipping TA plot.")
-        return False
+        return None
 
     dfp["analysis_number"] = range(1, len(dfp) + 1)
 
@@ -847,15 +864,29 @@ def write_rm_ta_diff_qc_plot(
     ax.set_ylim(-(ymax + pad), +(ymax + pad))
     ax.legend(frameon=False, fontsize=10, loc="best")
     fig.tight_layout()
+    # Detach from pyplot so many runs do not accumulate open figures; the
+    # Figure can still be saved.
+    plt.close(fig)
+    return fig
 
+
+def write_rm_ta_diff_qc_plot(
+    crm_qc: pd.DataFrame,
+    out_jpeg: Path,
+    sample_tag_col: str,
+    sop: TaSop,
+    annotate_points: bool = True,
+    title: str = "RM Alkalinity Difference",
+) -> bool:
+    """Save :func:`rm_ta_diff_qc_figure` as a JPEG; False if there was nothing to plot."""
+    fig = rm_ta_diff_qc_figure(crm_qc, sample_tag_col, sop, annotate_points=annotate_points, title=title)
+    if fig is None:
+        return False
     out_jpeg.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_jpeg, format="jpeg", dpi=240, bbox_inches="tight")
-    plt.close(fig)
     return True
 
-
-def write_ta_markdown_report(
-    out_md: Path,
+def ta_markdown_report(
     xlsx_path: Path,
     sheet_name: str,
     params: Dict[str, Any],
@@ -863,8 +894,8 @@ def write_ta_markdown_report(
     ta_col_used: str,
     sample_tag_col_used: str,
     group_by: Optional[str],
-) -> None:
-    """Write a markdown summary of TA CRM QC."""
+) -> str:
+    """Markdown summary of TA CRM QC."""
     diag_lines = "\n".join([f"- {d}" for d in ta_summary.get("diagnostics", [])]) or "- (none)"
 
     md = f"""# TA CRM QC Report
@@ -914,8 +945,21 @@ def write_ta_markdown_report(
 ## Diagnostics
 {diag_lines}
 """
-    write_text(out_md, md)
+    return md
 
+
+def write_ta_markdown_report(
+    out_md: Path,
+    xlsx_path: Path,
+    sheet_name: str,
+    params: Dict[str, Any],
+    ta_summary: Dict[str, Any],
+    ta_col_used: str,
+    sample_tag_col_used: str,
+    group_by: Optional[str],
+) -> None:
+    """Save :func:`ta_markdown_report` to ``out_md``."""
+    write_text(out_md, ta_markdown_report(xlsx_path, sheet_name, params, ta_summary, ta_col_used, sample_tag_col_used, group_by))
 
 # =============================================================================
 # pH standard QC
@@ -1311,9 +1355,8 @@ def apply_ph_standard_qc_and_correction(
     return out, std, corr_table, summary
 
 
-def write_phstd_qc_plot(
+def phstd_qc_figure(
     phstd_qc: pd.DataFrame,
-    out_jpeg: Path,
     sample_tag_col: str,
     diff_col: str,
     outlier_col: str,
@@ -1322,10 +1365,10 @@ def write_phstd_qc_plot(
     annotate_points: bool,
     title: str,
     summary: Dict[str, Any],
-) -> bool:
-    """Write a JPEG scatter of analysis number against expected minus measured pH.
+) -> Optional[Any]:
+    """Scatter of analysis number against expected minus measured pH.
 
-    Returns True if a plot was written, False if skipped (no plottable data).
+    Returns the matplotlib Figure, or None when there is nothing to plot.
     """
     try:
         import matplotlib.pyplot as plt
@@ -1337,7 +1380,7 @@ def write_phstd_qc_plot(
         # were logged but carry no measured pH/temperature). Skip the plot
         # and signal that nothing was written rather than aborting the run.
         print("INFO: no pH standard rows to plot; skipping pH-standard plot.")
-        return False
+        return None
 
     dfp = phstd_qc.copy()
     dfp[diff_col] = pd.to_numeric(dfp[diff_col], errors="coerce")
@@ -1348,7 +1391,7 @@ def write_phstd_qc_plot(
             "INFO: no numeric pH differences to plot "
             "(standards present but missing pH/temp); skipping plot."
         )
-        return False
+        return None
 
     dfp["analysis_number"] = range(1, len(dfp) + 1)
     outlier_mask = _bool_col(dfp, outlier_col)
@@ -1433,21 +1476,39 @@ def write_phstd_qc_plot(
     ax.set_ylim(-(ymax + pad), +(ymax + pad))
     ax.legend(frameon=False, fontsize=10, loc="best")
     fig.tight_layout()
+    # Detach from pyplot so many runs do not accumulate open figures; the
+    # Figure can still be saved.
+    plt.close(fig)
+    return fig
 
+
+def write_phstd_qc_plot(
+    phstd_qc: pd.DataFrame,
+    out_jpeg: Path,
+    sample_tag_col: str,
+    diff_col: str,
+    outlier_col: str,
+    thr_ok: float,
+    thr_warn: float,
+    annotate_points: bool,
+    title: str,
+    summary: Dict[str, Any],
+) -> bool:
+    """Save :func:`phstd_qc_figure` as a JPEG; False if there was nothing to plot."""
+    fig = phstd_qc_figure(phstd_qc, sample_tag_col, diff_col, outlier_col, thr_ok, thr_warn, annotate_points, title, summary)
+    if fig is None:
+        return False
     out_jpeg.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_jpeg, format="jpeg", dpi=240, bbox_inches="tight")
-    plt.close(fig)
     return True
 
-
-def write_phstd_markdown_report(
-    out_md: Path,
+def phstd_markdown_report(
     xlsx_path: Path,
     sheet_name: str,
     params: Dict[str, Any],
     ph_summary: Dict[str, Any],
-) -> None:
-    """Write a markdown summary of pH standard QC."""
+) -> str:
+    """Markdown summary of pH standard QC."""
     diag_lines = "\n".join([f"- {d}" for d in ph_summary.get("diagnostics", [])]) or "- (none)"
 
     md = f"""# pH Standard QC Report
@@ -1499,4 +1560,285 @@ def write_phstd_markdown_report(
 ## Diagnostics
 {diag_lines}
 """
-    write_text(out_md, md)
+    return md
+
+
+def write_phstd_markdown_report(
+    out_md: Path,
+    xlsx_path: Path,
+    sheet_name: str,
+    params: Dict[str, Any],
+    ph_summary: Dict[str, Any],
+) -> None:
+    """Save :func:`phstd_markdown_report` to ``out_md``."""
+    write_text(out_md, phstd_markdown_report(xlsx_path, sheet_name, params, ph_summary))
+
+
+# =============================================================================
+# Stage run (#42)
+# =============================================================================
+
+NOTEBOOK = "02_ta_ph_qc"
+
+# Defaults for the notebook 02 parameters that change what Stage QC computes
+# or writes. Kept equal to the notebook's parameters cell by a test.
+QC_RUN_DEFAULTS: Dict[str, Any] = {
+    "HTML_MAX_ROWS": None,
+    "WRITE_DERIVED_CSV": True,
+    "WRITE_HTML_TABLE": True,
+    "WRITE_PLOTS": True,
+    "TA_COL": "ta",
+    "PH_COL": "pH_lab",
+    "PH_TEMP_COL": "temp_lab",
+    "SAMPLE_TAG_COL": "sample_tag",
+    "ROW_ROLE_PREFIXES": {"CRM": "RM", "STANDARD": "TRIS"},
+    "CRM_CORRECT_TA": True,
+    "CRM_BATCH": "213",
+    "CRM_TA_OVERRIDE": None,
+    "NO_REQUIRE_TA_FOR_CRM": False,
+    "GROUP_BY": None,
+    "MIN_CRM_N": 2,
+    "TA_MAD_K": 3.5,
+    "TA_MAX_ABS_DIFF": 20.0,
+    "CORRECT_CRM_TOO": False,
+    "TA_NO_ADJUST": 2.0,
+    "TA_REJECT": 20.0,
+    "TA_PLOT_TITLE": "RM Alkalinity Difference",
+    "TA_PLOT_NO_LABELS": False,
+    "PHSTD_QC": True,
+    "PH_BUFFER": "tris",
+    "PHSTD_CORRECT_SAMPLES": False,
+    "MIN_PHSTD_N": 2,
+    "PH_MAD_K": 3.5,
+    "PH_MAX_ABS_DIFF": 0.03,
+    "PH_OK": 0.02,
+    "PH_WARN": 0.05,
+    "PH_PLOT_TITLE": "TRIS pH Difference",
+    "PH_PLOT_NO_LABELS": False,
+}
+
+_BOOL_PARAMETERS = (
+    "WRITE_DERIVED_CSV", "WRITE_HTML_TABLE", "WRITE_PLOTS", "CRM_CORRECT_TA",
+    "NO_REQUIRE_TA_FOR_CRM", "CORRECT_CRM_TOO", "PHSTD_QC", "PHSTD_CORRECT_SAMPLES",
+    "TA_PLOT_NO_LABELS", "PH_PLOT_NO_LABELS",
+)
+
+
+def qc_run_parameters(params: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """Stage QC's run parameters: ``QC_RUN_DEFAULTS`` overridden by ``params``.
+
+    Keys outside ``QC_RUN_DEFAULTS`` are ignored. Booleans and numbers are
+    normalised from their notebook or YAML spellings. Raises ``ValueError``
+    for a value Stage QC cannot use; an unreadable boolean stops with
+    ``SystemExit``.
+    """
+    p = {**QC_RUN_DEFAULTS, **{k: v for k, v in (params or {}).items() if k in QC_RUN_DEFAULTS}}
+    for key in _BOOL_PARAMETERS:
+        p[key] = as_bool(p[key])
+    p["HTML_MAX_ROWS"] = None if is_none_like(p["HTML_MAX_ROWS"]) else int(p["HTML_MAX_ROWS"])
+    p["PH_BUFFER"] = str(p["PH_BUFFER"]).strip().lower()
+
+    if int(p["MIN_CRM_N"]) < 1:
+        raise ValueError(f"MIN_CRM_N must be >= 1, got {p['MIN_CRM_N']}")
+    if int(p["MIN_PHSTD_N"]) < 1:
+        raise ValueError(f"MIN_PHSTD_N must be >= 1, got {p['MIN_PHSTD_N']}")
+    if float(p["TA_REJECT"]) <= float(p["TA_NO_ADJUST"]):
+        raise ValueError(
+            "TA_REJECT must be greater than TA_NO_ADJUST. "
+            f"Got TA_REJECT={p['TA_REJECT']}, TA_NO_ADJUST={p['TA_NO_ADJUST']}"
+        )
+    if float(p["PH_WARN"]) <= float(p["PH_OK"]):
+        raise ValueError(f"PH_WARN must be greater than PH_OK. Got PH_WARN={p['PH_WARN']}, PH_OK={p['PH_OK']}")
+    try:
+        p["ROW_ROLE_PREFIXES"] = {
+            role.value: prefix for role, prefix in row_roles.parse_prefixes(p["ROW_ROLE_PREFIXES"]).items()
+        }
+    except (ValueError, AttributeError) as exc:
+        raise ValueError(f"Invalid ROW_ROLE_PREFIXES {p['ROW_ROLE_PREFIXES']!r}: {exc}") from exc
+    if p["PH_BUFFER"] not in {"tris", "amp", "bis"}:
+        raise ValueError(f"PH_BUFFER must be one of tris, amp, or bis. Got: {p['PH_BUFFER']}")
+    if not p["WRITE_DERIVED_CSV"]:
+        raise ValueError("WRITE_DERIVED_CSV must be True when running the full pipeline.")
+    return p
+
+
+def _max_abs(value: Any) -> Optional[float]:
+    return None if is_none_like(value) or float(value) == 0 else float(value)
+
+
+def run(
+    sheets: Mapping[str, pd.DataFrame],
+    stage_config: "StageConfig",
+    params: Optional[Mapping[str, Any]] = None,
+    *,
+    source: Optional[str] = None,
+) -> StageResult:
+    """Run Stage QC (TA CRM QC + pH-standard QC) on a workbook's sheets; no disk IO.
+
+    ``sheets`` maps each sheet name to its frame, as read from the
+    workbook. ``params`` holds notebook 02's parameters (see
+    :func:`qc_run_parameters`). Certified CRM values come from
+    ``stage_config.crm_certified_values`` (loaded with
+    ``StageConfig.load_crm_values``); None uses the in-code fallback table.
+    ``source`` labels the workbook in the reports and the run bundle.
+
+    Each sheet's files sit under ``sheet_<safe name>/``. Raises
+    ``ValueError`` for another Stage's config or an unusable parameter.
+    """
+    if stage_config.stage != "qc":
+        raise ValueError(f"Stage QC needs the qc config, got {stage_config.stage}.")
+    p = qc_run_parameters(params)
+    workbook = Path(source) if source is not None else Path("workbook.xlsx")
+    crm_values = stage_config.crm_certified_values if p["CRM_CORRECT_TA"] else None
+    buffer_slug = safe_sheet_name(p["PH_BUFFER"])
+    sop = TaSop(no_adjust=float(p["TA_NO_ADJUST"]), reject=float(p["TA_REJECT"]))
+    ph_thr = PhStdStatusThresholds(ok=float(p["PH_OK"]), warn=float(p["PH_WARN"]))
+    prefixes = p["ROW_ROLE_PREFIXES"]
+    report_params = {
+        "CRM_TAG_PREFIX": prefixes["CRM"],
+        "CRM_BATCH": p["CRM_BATCH"],
+        "PH_BUFFER": p["PH_BUFFER"],
+        "STANDARD_TAG_PREFIX": prefixes["STANDARD"],
+    }
+    tag_param = p["SAMPLE_TAG_COL"]
+
+    result = StageResult(
+        stage="qc",
+        input_file=source,
+        config_files=[stage_config.source, stage_config.crm_values_source],
+        bundle_name=NOTEBOOK,
+    )
+    sheet_summaries: Dict[str, Dict[str, Any]] = {}
+
+    for sheet_name, raw in sheets.items():
+        df = normalize_columns(raw)
+        safe_sheet = safe_sheet_name(str(sheet_name))
+        root = f"sheet_{safe_sheet}"
+
+        df_out = df.copy()
+        # Decide each row's role once, from the Tag prefix (ADR-0006); every
+        # later Stage reads the row_role column instead of re-deriving it.
+        df_out[row_roles.ROW_ROLE_COL] = row_roles.assign_row_roles(
+            df_out, prefixes, tag_col=resolve_col(df_out, tag_param)
+        )
+        role_counts = row_roles.summarize_row_roles(df_out, tag_col=resolve_col(df_out, tag_param))
+        ta_summary: Dict[str, Any] = {}
+        ph_summary: Dict[str, Any] = {}
+
+        if p["CRM_CORRECT_TA"]:
+            df_out, crm_qc, ta_corr_table, ta_summary = apply_ta_crm_correction(
+                df=df_out,
+                ta_col=p["TA_COL"],
+                sample_tag_col=tag_param,
+                crm_batch=p["CRM_BATCH"],
+                crm_ta_override=p["CRM_TA_OVERRIDE"],
+                group_by=p["GROUP_BY"],
+                require_ta_value_for_crm=not p["NO_REQUIRE_TA_FOR_CRM"],
+                min_crm_n=int(p["MIN_CRM_N"]),
+                mad_k=float(p["TA_MAD_K"]),
+                max_abs_diff=_max_abs(p["TA_MAX_ABS_DIFF"]),
+                correct_only_samples=not p["CORRECT_CRM_TOO"],
+                sop=sop,
+                crm_values=crm_values,  # AUDIT FIX N-1
+            )
+            result.tables[f"{root}/qc/ta_crm_qc.csv"] = crm_qc
+            result.tables[f"{root}/qc/ta_corrections.csv"] = ta_corr_table
+            result.reports[f"{root}/reports/ta_crm_report.md"] = ta_markdown_report(
+                xlsx_path=workbook,
+                sheet_name=str(sheet_name),
+                params=report_params,
+                ta_summary=ta_summary,
+                ta_col_used=resolve_col(df, p["TA_COL"]),
+                sample_tag_col_used=resolve_col(df, tag_param),
+                group_by=p["GROUP_BY"],
+            )
+            if p["WRITE_PLOTS"] and tag_param in crm_qc.columns:
+                fig = rm_ta_diff_qc_figure(
+                    crm_qc=crm_qc,
+                    sample_tag_col=resolve_col(crm_qc, tag_param),
+                    sop=sop,
+                    annotate_points=not p["TA_PLOT_NO_LABELS"],
+                    title=str(p["TA_PLOT_TITLE"]),
+                )
+                if fig is not None:
+                    result.figures[f"{root}/figures/rm_ta_diff_qc.jpeg"] = fig
+
+        if p["PHSTD_QC"]:
+            df_out, phstd_qc, ph_corr_table, ph_summary = apply_ph_standard_qc_and_correction(
+                df=df_out,
+                buffer=p["PH_BUFFER"],
+                ph_col=p["PH_COL"],
+                temp_col=p["PH_TEMP_COL"],
+                sample_tag_col=tag_param,
+                group_by=p["GROUP_BY"],
+                mad_k=float(p["PH_MAD_K"]),
+                max_abs_diff=_max_abs(p["PH_MAX_ABS_DIFF"]),
+                min_std_n=int(p["MIN_PHSTD_N"]),
+                correct_samples=p["PHSTD_CORRECT_SAMPLES"],
+                status_thr=ph_thr,
+            )
+            result.tables[f"{root}/qc/phstd_qc_{buffer_slug}.csv"] = phstd_qc
+            result.tables[f"{root}/qc/phstd_corrections_{buffer_slug}.csv"] = ph_corr_table
+            result.reports[f"{root}/reports/phstd_report_{buffer_slug}.md"] = phstd_markdown_report(
+                xlsx_path=workbook, sheet_name=str(sheet_name), params=report_params, ph_summary=ph_summary
+            )
+            # Plot only usable standards (numeric expected-minus-measured
+            # diffs); with none there is nothing to draw.
+            plottable = (
+                "phstd_diff" in phstd_qc.columns
+                and pd.to_numeric(phstd_qc["phstd_diff"], errors="coerce").notna().any()
+            )
+            if p["WRITE_PLOTS"] and plottable and tag_param in phstd_qc.columns:
+                fig = phstd_qc_figure(
+                    phstd_qc=phstd_qc,
+                    sample_tag_col=resolve_col(phstd_qc, tag_param),
+                    diff_col="phstd_diff",
+                    outlier_col="phstd_diff_is_outlier",
+                    thr_ok=float(ph_thr.ok),
+                    thr_warn=float(ph_thr.warn),
+                    annotate_points=not p["PH_PLOT_NO_LABELS"],
+                    title=str(p["PH_PLOT_TITLE"]),
+                    summary=ph_summary,
+                )
+                if fig is not None:
+                    result.figures[f"{root}/figures/phstd_diff_qc_{buffer_slug}.jpeg"] = fig
+
+        # derived.csv is the file Stage 1A reads. It keeps the plain
+        # DataFrame.to_csv layout it always had, so it is a table here.
+        result.tables[f"{root}/data/derived.csv"] = df_out
+        if p["WRITE_HTML_TABLE"]:
+            result.texts[f"{root}/tables/table.html"] = html_table(
+                df_out, p["HTML_MAX_ROWS"], f"{workbook.stem} - sheet {sheet_name} (derived)"
+            )
+
+        sheet_summaries[str(sheet_name)] = {
+            "sheet_name": str(sheet_name),
+            "sheet_safe_name": safe_sheet,
+            "row_role_counts": role_counts,
+            "ta_summary": ta_summary,
+            "ph_summary": ph_summary,
+            "root": root,
+            "derived_csv": f"{root}/data/derived.csv",
+        }
+
+    result.manifest = {
+        "notebook": NOTEBOOK,
+        "generated_utc": utc_stamp(),
+        "input_xlsx": source,
+        "config": {
+            "config_path": stage_config.source,
+            "crm_values_path": stage_config.crm_values_source if p["CRM_CORRECT_TA"] else None,
+            "parameter_keys": sorted((stage_config.config.get("parameters") or {}).keys()),
+            "warnings": list(stage_config.warnings),
+        },
+        "parameters": {
+            **p,
+            "CRM_VALUES_SOURCE": "yaml_file" if crm_values is not None else "in_code_fallback",
+            "PH_BUFFER_FILE_SLUG": buffer_slug,
+        },
+        "sheets_processed": list(sheets.keys()),
+        "derived_csv_by_sheet": {name: info["derived_csv"] for name, info in sheet_summaries.items()},
+        "sheet_summaries": sheet_summaries,
+        "package_versions": package_versions(),
+    }
+    return result
