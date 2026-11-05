@@ -8,6 +8,7 @@ intended difference in the PR description (see tests/golden/README.md).
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -107,8 +108,20 @@ def _fixture_pair(tmp_path: Path, golden_text: str, fresh_text: str) -> list[str
         ("sample_id,station_id\nS1,\n", "sample_id,station_id\nS1,NA\n"),
         # An integer count is exact even when the difference is within tolerance.
         ("group,n\nA,1000000000000\n", "group,n\nA,1000000000001\n"),
+        # Identifiers that look like floats are still exact text.
+        ("sample_id,station_id\nS1,1.0\n", "sample_id,station_id\nS1,01.0\n"),
+        ("sample_id,station_id\n1e12,V01\n", "sample_id,station_id\n1.000000000001e12,V01\n"),
+        # A float-formatted count is exact too: counts are not in FLOAT_COLUMNS.
+        ("group,n_rows\nA,7.0\n", "group,n_rows\nA,7.000000000001\n"),
     ],
-    ids=["leading-zero-identifier", "empty-vs-literal-NA", "integer-count"],
+    ids=[
+        "leading-zero-identifier",
+        "empty-vs-literal-NA",
+        "integer-count",
+        "float-like-station-id",
+        "float-like-sample-id",
+        "float-formatted-count",
+    ],
 )
 def test_compare_reports_text_changes_inference_would_hide(
     tmp_path: Path, golden_text: str, fresh_text: str
@@ -118,7 +131,23 @@ def test_compare_reports_text_changes_inference_would_hide(
 
 
 def test_compare_applies_tolerance_only_between_floats(tmp_path: Path) -> None:
+    golden = "ph_best\n0.013999999999999346\n"
+    assert _fixture_pair(tmp_path / "a", golden, "ph_best\n0.0139999999999993\n") == []
+    assert _fixture_pair(tmp_path / "b", golden, "ph_best\n0.0141\n") != []
+    assert _fixture_pair(tmp_path / "c", golden, "ph_best\nabc\n") != []
+    # The same last-digit difference outside FLOAT_COLUMNS is reported.
     golden = "x\n0.013999999999999346\n"
-    assert _fixture_pair(tmp_path / "a", golden, "x\n0.0139999999999993\n") == []
-    assert _fixture_pair(tmp_path / "b", golden, "x\n0.0141\n") != []
-    assert _fixture_pair(tmp_path / "c", golden, "x\nabc\n") != []
+    assert _fixture_pair(tmp_path / "d", golden, "x\n0.0139999999999993\n") != []
+
+
+def _baseline_columns() -> set[str]:
+    return {
+        str(c) for p in gb.output_csvs(gb.GOLDEN_DIR) for c in gb._read(gb.GOLDEN_DIR / p).columns
+    }
+
+
+def test_float_columns_are_current_and_exclude_identifiers() -> None:
+    assert not gb.FLOAT_COLUMNS - _baseline_columns(), "FLOAT_COLUMNS names a column no stage writes"
+    identifier = re.compile(r"(_id|batch|flag|station|sample|cast|bottle|niskin)", re.IGNORECASE)
+    assert not {c for c in gb.FLOAT_COLUMNS if identifier.search(c)}
+    assert not {c for c in gb.FLOAT_COLUMNS if c == "n" or c.startswith("n_")}

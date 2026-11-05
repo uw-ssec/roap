@@ -5,10 +5,13 @@
 `run_pipeline.sh` writes under a `data/`, `tables/` or `qc/` directory.
 `tests/test_golden_baseline.py` reruns the pipeline and compares each file cell
 by cell as CSV text, with no type inference and no NA parsing, so `0213` differs
-from `213` and a literal `NA` differs from an empty cell. Only two values
-written as floats (with a decimal point or exponent) may differ within
-`rtol=1e-9`, `atol=1e-12`. It also fails when a stage writes a new CSV or stops
-writing one.
+from `213` and a literal `NA` differs from an empty cell. Tolerance
+(`rtol=1e-9`, `atol=1e-12`) applies only in the measured and computed columns
+listed in `FLOAT_COLUMNS` in `tools/golden_baseline.py`, and only when both
+values are written as floats. Identifiers, flags, counts and text always match
+exactly, so station `01.0` differs from `1.0`. A new float column must be added
+to `FLOAT_COLUMNS` on purpose before it gets tolerance. It also fails when a
+stage writes a new CSV or stops writing one.
 
 `tests/test_no_unpublished_data.py` allows tracked data under `example_data/`
 only at the CSV paths the generator writes

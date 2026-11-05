@@ -41,10 +41,43 @@ OUTPUT_SUBDIRS = {"data", "tables", "qc"}
 # input paths (source_file, source_file_stage2, ...) and stage timestamps.
 VOLATILE_COLUMN = re.compile(r"^(source_file(_stage\w+)?|stage\w+_processed_utc)$")
 
-# Float comparison tolerance, applied only between two FLOAT_TEXT values: tight,
-# but allows last-bit differences across platforms in PyCO2SYS and NumPy.
+# Float comparison tolerance: tight, but allows last-bit differences across
+# platforms in PyCO2SYS and NumPy. Applied only in FLOAT_COLUMNS, and only when
+# both cells are FLOAT_TEXT; every other cell must match its baseline text.
 RTOL = 1e-9
 ATOL = 1e-12
+
+# Measured and computed quantities whose last digits may vary by platform. This
+# is an allowlist: identifiers (sample, station, batch), flags, counts and text
+# are never listed, so they compare exactly even when they look like floats
+# (``01.0`` and ``1.0`` are different station IDs). A new float output column
+# fails --check on a platform difference until it is added here on purpose.
+FLOAT_COLUMNS = frozenset(
+    {
+        # Stage QC / 1a / 1b: lab measurements and CRM / pH-standard corrections
+        "pH_lab", "salinity", "temp_lab", "ta", "ta_certified_umolkg",
+        "ta_correction_raw_umolkg", "ta_correction_used_umolkg", "ta_corr_value",
+        "ta_corr_sd", "ta_corr_se", "ta_corrected_umolkg", "ta_diff_umolkg",
+        "phstd_expected", "phstd_diff", "phstd_correction_raw", "phstd_correction_used",
+        "phstd_corr_value", "phstd_corr_sd", "phstd_corr_se", "ph_corrected_from_phstd",
+        "ph_after_phstd_qc", "ph_observed", "temperature_measurement_c",
+        "overall_correction", "overall_sd",
+        # Stage 2 / 3 / 4: field values and carbonate-system results
+        "lat", "lon", "latitude_deg", "longitude_deg", "depth_m", "depth_bin_m",
+        "depth_round_m", "pressure_output_dbar", "calc_pressure_dbar", "calc_salinity",
+        "calc_temperature_c", "temperature_insitu_c", "chlorophyll", "oxygen_umol_l",
+        "nitrate_nitrite_umol_l", "phosphate_umol_l", "silicate_umol_l", "ta_umol_kg",
+        "ta_best_umolkg", "ph_best", "ph_calculated", "ph_co2sys",
+        "ph_best_minus_ph_co2sys", "ph_best_minus_ph_co2sys_temp_harmonized",
+        "dic_best_umol_kg", "dic_calculated_umol_kg", "pco2_best_uatm", "pco2_calc_uatm",
+        "co2aq_calc_umol_kg", "co3_calc_umol_kg", "hco3_calc_umol_kg",
+        "dic_minus_species_sum", "dic_minus_sum", "dic_species_rel_diff",
+        "dic_species_sum", "dic_sum_species", "dic_sum_tol", "dic_tol_used",
+        # Stage 4 tables: range limits, parsed values and percentages
+        "min_allowed", "max_allowed", "value", "pct_missing", "pct_any_carbonate_issue",
+        "pct_dic_inconsistent", "pct_ph_diag_mismatch",
+    }
+)
 
 
 def output_csvs(out_root: Path) -> list[Path]:
@@ -56,8 +89,8 @@ def output_csvs(out_root: Path) -> list[Path]:
     )
 
 
-# A float as the stages write it: has a decimal point or an exponent. Values
-# without one (batch numbers, station IDs, counts) are compared as exact text.
+# A float as the stages write it: has a decimal point or an exponent. Even in a
+# FLOAT_COLUMNS column, a value without one (or ``nan``) is compared as text.
 FLOAT_TEXT = re.compile(r"^[+-]?(?:(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)$")
 
 
@@ -98,11 +131,11 @@ def load_canonical(text: str) -> pd.DataFrame:
     return _parse(text)
 
 
-def _cells_match(actual: str, expected: str) -> bool:
-    """Exact text, except two float-formatted values may differ within tolerance."""
+def _cells_match(column: str, actual: str, expected: str) -> bool:
+    """Exact text, except two floats in a FLOAT_COLUMNS column may differ within tolerance."""
     if actual == expected:
         return True
-    if FLOAT_TEXT.match(actual) and FLOAT_TEXT.match(expected):
+    if column in FLOAT_COLUMNS and FLOAT_TEXT.match(actual) and FLOAT_TEXT.match(expected):
         return math.isclose(float(actual), float(expected), rel_tol=RTOL, abs_tol=ATOL)
     return False
 
@@ -118,7 +151,7 @@ def compare_frames(actual: pd.DataFrame, expected: pd.DataFrame) -> list[str]:
         bad = [
             i
             for i, (a, e) in enumerate(zip(actual[col], expected[col], strict=True))
-            if not _cells_match(a, e)
+            if not _cells_match(str(col), a, e)
         ]
         if bad:
             i = bad[0]
