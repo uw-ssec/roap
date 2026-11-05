@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # =====================================================================
-# run_pipeline.sh — drive the OA notebook pipeline end to end.
+# run_pipeline.sh — drive the OA pipeline end to end.
+#
+# Stage QC and Stages 1A to 4 run in process through `roap run`
+# (roap.pipeline.run_pipeline). Only the optional notebooks 01 and 03 run
+# through papermill.
 #
 # Usage:
 #     ./run_pipeline.sh INPUT_XLSX OUTPUT_ROOT [options]
@@ -28,13 +32,13 @@
 #                         runner unless the notebooks load them internally.
 #                         The simplest current pattern is to create per stage
 #                         config files that include or duplicate those settings.
-#     --no-parquet        Pass NO_PARQUET=True to stages 04 to 08.
+#     --no-parquet        Write CSV only for stages 04 to 08.
 #     --include-viewer    Also run Notebook 01.
 #     --include-review    Also run Notebook 03.
 #     --start-from STAGE  Skip stages before STAGE. STAGE must be one of:
 #                         02, 04, 05, 06, 07, 08.
-#     --dry-run           Print Papermill commands but do not run them.
-#                         In dry run mode, downstream required output files,
+#     --dry-run           Print the commands but do not run them.
+#                         In dry run mode, required output files,
 #                         Papermill, and roap import checks are skipped.
 #     -h, --help          Show this help and exit.
 #
@@ -283,17 +287,20 @@ mkdir -p "$RUNS_DIR"
 # ---------------------------------------------------------------------
 
 if [[ "$DRY_RUN" -eq 0 ]]; then
-    "$PYTHON_BIN" -c "import papermill" >/dev/null 2>&1 || {
-        echo "ERROR: papermill is not installed in this Python environment." >&2
-        echo "Install with: $PYTHON_BIN -m pip install -e \".[dev]\"" >&2
+    "$PYTHON_BIN" -c "import roap" >/dev/null 2>&1 || {
+        echo "ERROR: roap is not importable in this Python environment." >&2
+        echo "Install with: pixi install (then use the pixi environment's python)" >&2
         exit 2
     }
 
-    "$PYTHON_BIN" -c "import roap" >/dev/null 2>&1 || {
-        echo "ERROR: roap is not importable in this Python environment." >&2
-        echo "Install with: $PYTHON_BIN -m pip install -e \".[dev]\"" >&2
-        exit 2
-    }
+    # Only the optional notebooks 01 and 03 still run through papermill.
+    if [[ "$INCLUDE_VIEWER" -eq 1 || "$INCLUDE_REVIEW" -eq 1 ]]; then
+        "$PYTHON_BIN" -c "import papermill" >/dev/null 2>&1 || {
+            echo "ERROR: papermill is not installed in this Python environment." >&2
+            echo "It is needed for --include-viewer and --include-review." >&2
+            exit 2
+        }
+    fi
 fi
 
 require_file() {
@@ -321,52 +328,24 @@ require_notebook() {
     fi
 }
 
-for notebook in \
-    "$NOTEBOOK_DIR/01_excel_viewer.ipynb" \
-    "$NOTEBOOK_DIR/02_ta_ph_qc.ipynb" \
-    "$NOTEBOOK_DIR/03_qc_output_review.ipynb" \
-    "$NOTEBOOK_DIR/04_stage1a.ipynb" \
-    "$NOTEBOOK_DIR/05_stage1b.ipynb" \
-    "$NOTEBOOK_DIR/06_stage2.ipynb" \
-    "$NOTEBOOK_DIR/07_stage3.ipynb" \
-    "$NOTEBOOK_DIR/08_stage4.ipynb"
-do
-    require_notebook "$notebook"
-done
+if [[ "$INCLUDE_VIEWER" -eq 1 ]]; then
+    require_notebook "$NOTEBOOK_DIR/01_excel_viewer.ipynb"
+fi
+if [[ "$INCLUDE_REVIEW" -eq 1 ]]; then
+    require_notebook "$NOTEBOOK_DIR/03_qc_output_review.ipynb"
+fi
 
 # ---------------------------------------------------------------------
 # Per stage output directories
 # ---------------------------------------------------------------------
 
 QC_OUT="$OUTPUT_ROOT/oa_prelim_data__qc_outputs"
-S1A_OUT="$OUTPUT_ROOT/oa_stage1a_outputs"
-S1B_OUT="$OUTPUT_ROOT/oa_stage1b_outputs"
-S2_OUT="$OUTPUT_ROOT/oa_stage2_outputs"
-S3_OUT="$OUTPUT_ROOT/oa_stage3_outputs"
 S4_OUT="$OUTPUT_ROOT/oa_stage4_outputs"
 VIEWER_OUT="$OUTPUT_ROOT/oa_viewer_outputs"
 
 # ---------------------------------------------------------------------
 # Runtime helpers
 # ---------------------------------------------------------------------
-
-resolve_config() {
-    local stage_name="$1"
-
-    if [[ -n "$CONFIG_DIR" ]]; then
-        for ext in yaml yml json; do
-            local candidate="$CONFIG_DIR/${stage_name}.${ext}"
-            if [[ -f "$candidate" ]]; then
-                echo "$candidate"
-                return
-            fi
-        done
-
-        echo "WARNING: no per stage config found for $stage_name in $CONFIG_DIR; using notebook defaults." >&2
-    fi
-
-    echo "None"
-}
 
 resolve_qc_sheet_folder() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -471,7 +450,7 @@ echo "  python bin   : $PYTHON_BIN"
 echo "  sheet        : $SHEET"
 echo "  start from   : Stage $START_FROM"
 echo "  config dir   : ${CONFIG_DIR:-(none)}"
-echo "  config mode  : per stage CONFIG_PATH files"
+echo "  engine       : roap run (in process)"
 echo "  parquet      : $( [[ "$NO_PARQUET" == "True" ]] && echo disabled || echo enabled )"
 echo "  dry run      : $( [[ "$DRY_RUN" -eq 1 ]] && echo yes || echo no )"
 echo "  runs dir     : $RUNS_DIR"
@@ -489,24 +468,27 @@ if [[ "$INCLUDE_VIEWER" -eq 1 ]] && should_run 2; then
 fi
 
 # ---------------------------------------------------------------------
-# Notebook 02: TA and pH QC
+# Stage QC and Stages 1A to 4, plus the run bundle: roap run (ADR-0011)
 # ---------------------------------------------------------------------
+# roap run resolves each Stage's config in CONFIG_DIR, writes every Stage
+# under OUTPUT_ROOT and writes run_bundle_manifest.json into RUNS_DIR.
 
-if should_run 2; then
-    CONFIG="$(resolve_config 02_ta_ph_qc)"
+ROAP_ARGS=(-m roap run "$INPUT_XLSX" "$OUTPUT_ROOT"
+    --sheet "$SHEET"
+    --start-from "$START_FROM"
+    --runs-dir "$RUNS_DIR")
+if [[ -n "$CONFIG_DIR" ]]; then
+    ROAP_ARGS+=(--config-dir "$CONFIG_DIR")
+fi
+if [[ "$NO_PARQUET" == "True" ]]; then
+    ROAP_ARGS+=(--no-parquet)
+fi
 
-    PAPERMILL_ARGS=(
-        "$NOTEBOOK_DIR/02_ta_ph_qc.ipynb" "$RUNS_DIR/02_ta_ph_qc.run.ipynb"
-        -p XLSX_PATH "$INPUT_XLSX"
-        -p OUT_DIR "$QC_OUT"
-        -p SHEET "$SHEET"
-        -p CONFIG_PATH "$CONFIG"
-    )
-    if [[ -n "$CONFIG_DIR" ]]; then
-        PAPERMILL_ARGS+=(-p CRM_VALUES_CONFIG "$CONFIG_DIR/crm_certified_values.yaml")
-    fi
-
-    run_papermill "${PAPERMILL_ARGS[@]}"
+echo "----------------------------------------------------------------------"
+echo "$PYTHON_BIN ${ROAP_ARGS[*]}"
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    export GIT_COMMIT="${GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+    "$PYTHON_BIN" "${ROAP_ARGS[@]}"
 fi
 
 # ---------------------------------------------------------------------
@@ -522,125 +504,6 @@ if [[ "$INCLUDE_REVIEW" -eq 1 ]] && should_run 2; then
 fi
 
 # ---------------------------------------------------------------------
-# Notebook 04: Stage 1A
-# ---------------------------------------------------------------------
-
-if should_run 4; then
-    QC_DERIVED_CSV="$(resolve_qc_derived_csv)"
-    require_file "$QC_DERIVED_CSV" "Stage 04"
-    CONFIG="$(resolve_config 04_stage1a)"
-
-    run_papermill "$NOTEBOOK_DIR/04_stage1a.ipynb" "$RUNS_DIR/04_stage1a.run.ipynb" \
-        -p INPUT_CSV "$QC_DERIVED_CSV" \
-        -p OUT_DIR "$S1A_OUT" \
-        -p CONFIG_PATH "$CONFIG" \
-        -p NO_PARQUET "$NO_PARQUET"
-fi
-
-# ---------------------------------------------------------------------
-# Notebook 05: Stage 1B
-# ---------------------------------------------------------------------
-
-if should_run 5; then
-    require_file "$S1A_OUT/data/staged.csv" "Stage 05"
-    CONFIG="$(resolve_config 05_stage1b)"
-
-    run_papermill "$NOTEBOOK_DIR/05_stage1b.ipynb" "$RUNS_DIR/05_stage1b.run.ipynb" \
-        -p INPUT_CSV "$S1A_OUT/data/staged.csv" \
-        -p OUT_DIR "$S1B_OUT" \
-        -p CONFIG_PATH "$CONFIG" \
-        -p NO_PARQUET "$NO_PARQUET"
-fi
-
-# ---------------------------------------------------------------------
-# Notebook 06: Stage 2
-# ---------------------------------------------------------------------
-
-if should_run 6; then
-    require_file "$S1B_OUT/data/analysis_ready_samples.csv" "Stage 06"
-    CONFIG="$(resolve_config 06_stage2)"
-
-    run_papermill "$NOTEBOOK_DIR/06_stage2.ipynb" "$RUNS_DIR/06_stage2.run.ipynb" \
-        -p INPUT_CSV "$S1B_OUT/data/analysis_ready_samples.csv" \
-        -p OUT_DIR "$S2_OUT" \
-        -p CONFIG_PATH "$CONFIG" \
-        -p NO_PARQUET "$NO_PARQUET"
-fi
-
-# ---------------------------------------------------------------------
-# Notebook 07: Stage 3
-# ---------------------------------------------------------------------
-
-if should_run 7; then
-    require_file "$S2_OUT/data/enhanced.csv" "Stage 07"
-    CONFIG="$(resolve_config 07_stage3)"
-
-    run_papermill "$NOTEBOOK_DIR/07_stage3.ipynb" "$RUNS_DIR/07_stage3.run.ipynb" \
-        -p INPUT_CSV "$S2_OUT/data/enhanced.csv" \
-        -p OUT_DIR "$S3_OUT" \
-        -p CONFIG_PATH "$CONFIG" \
-        -p NO_PARQUET "$NO_PARQUET"
-fi
-
-# ---------------------------------------------------------------------
-# Notebook 08: Stage 4
-# ---------------------------------------------------------------------
-
-if should_run 8; then
-    require_file "$S3_OUT/data/enhanced.csv" "Stage 08"
-    CONFIG="$(resolve_config 08_stage4)"
-
-    run_papermill "$NOTEBOOK_DIR/08_stage4.ipynb" "$RUNS_DIR/08_stage4.run.ipynb" \
-        -p INPUT_CSV "$S3_OUT/data/enhanced.csv" \
-        -p OUT_DIR "$S4_OUT" \
-        -p CONFIG_PATH "$CONFIG" \
-        -p NO_PARQUET "$NO_PARQUET"
-fi
-
-# ---------------------------------------------------------------------
-# Final deliverable check
-# ---------------------------------------------------------------------
-
-if [[ "$DRY_RUN" -eq 0 ]] && should_run 8; then
-    require_file "$S4_OUT/data/analysis_ready.csv" "final Stage 4 deliverable"
-fi
-
-# ---------------------------------------------------------------------
-# Generate run bundle manifest
-# ---------------------------------------------------------------------"
-
-export OUTPUT_ROOT
-export INPUT_XLSX
-export CONFIG_DIR
-export RUNS_DIR
-export GIT_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
-
-"$PYTHON_BIN" -c "
-from roap.bundle import generate_run_bundle_manifest
-from roap import __version__
-from pathlib import Path
-import os
-
-run_dir = Path(os.environ.get('RUNS_DIR', ''))
-input_xlsx = Path(os.environ.get('INPUT_XLSX', ''))
-config_dir_str = os.environ.get('CONFIG_DIR', '')
-config_dir = Path(config_dir_str) if config_dir_str else None
-output_root_str = os.environ.get('OUTPUT_ROOT', '')
-output_root = Path(output_root_str) if output_root_str else None
-git_commit = os.environ.get('GIT_COMMIT', 'unknown')
-pipeline_version = __version__
-
-generate_run_bundle_manifest(
-    run_dir=run_dir,
-    input_xlsx=input_xlsx,
-    config_dir=config_dir,
-    git_commit=git_commit,
-    pipeline_version=pipeline_version,
-    output_root=output_root
-)
-" || echo "Warning: could not generate run bundle manifest"
-
-# ---------------------------------------------------------------------
 # Footer
 # ---------------------------------------------------------------------
 
@@ -651,6 +514,6 @@ else
     echo "Pipeline complete."
     echo "  Final deliverable : $S4_OUT/data/analysis_ready.csv"
     echo "  Per stage reports : $OUTPUT_ROOT/<stage>/reports/report.md"
-    echo "  Executed notebooks: $RUNS_DIR/*.run.ipynb"
+    echo "  Run bundle        : $RUNS_DIR/run_bundle_manifest.json"
 fi
 echo "======================================================================"

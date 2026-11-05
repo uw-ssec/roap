@@ -46,6 +46,7 @@ __all__ = [
     # Stage run
     "NOTEBOOK",
     "QC_RUN_DEFAULTS",
+    "anchor_manifest_paths",
     "qc_run_parameters",
     "run",
     # Reference data
@@ -1845,3 +1846,18 @@ def run(
         "package_versions": package_versions(),
     }
     return result
+
+
+def anchor_manifest_paths(result: StageResult, out_dir: Path) -> None:
+    """Make the per-sheet paths in a Stage QC manifest absolute under ``out_dir``.
+
+    ``run`` records them relative to the output directory it does not know;
+    the manifest has always held absolute paths.
+    """
+    out_dir = Path(out_dir)
+    summaries = result.manifest["sheet_summaries"]
+    for info in summaries.values():
+        info["root"] = str(out_dir / info["root"])
+        info["derived_csv"] = str(out_dir / info["derived_csv"])
+    result.manifest["derived_csv_by_sheet"] = {name: info["derived_csv"] for name, info in summaries.items()}
+    result.manifest["output_root"] = str(out_dir)
