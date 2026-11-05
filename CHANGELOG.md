@@ -14,6 +14,8 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 - Stage 1B `classify_rows_sample` no longer raises `NameError` on rows with a
   blank or unrecognised `sample_type`, or `IndexError` on frames without a
   `RangeIndex`; such rows fall back to the CRM/pH-standard QC flags (#38)
+- Notebook 06 (Stage 2) no longer silently drops user config keys that are not
+  in `STAGE2_DEFAULTS`, such as `required_stage2_input_columns` (#39)
 
 ## [2026.11.0] - 2026-11-04
 
