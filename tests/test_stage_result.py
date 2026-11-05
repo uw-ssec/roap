@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
+import ntpath
+from pathlib import Path, PureWindowsPath
 
 import pandas as pd
 import pytest
@@ -94,11 +95,41 @@ def test_disk_writer_needs_bundle_provenance(tmp_path) -> None:
     write_stage_result(result, tmp_path / "out2", bundle=False)
 
 
-@pytest.mark.parametrize("rel", ["/abs.csv", "../up.csv", "noext", MANIFEST_PATH])
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "/abs.csv",
+        "../up.csv",
+        "a/../../up.csv",
+        "noext",
+        MANIFEST_PATH,
+        # Windows forms, rejected on every platform because the disk writer
+        # joins keys with the native Path.
+        "..\\escape.csv",
+        "a\\b.csv",
+        "C:\\outside.csv",
+        "C:/outside.csv",
+        "C:outside.csv",
+        "\\\\server\\share\\x.csv",
+        "//server/share/x.csv",
+        "\\rooted.csv",
+        "a//b.csv",
+        "./a.csv",
+    ],
+)
 def test_bad_paths_are_rejected(tmp_path, rel) -> None:
     result = StageResult(stage="demo", texts={rel: "x"})
     with pytest.raises(ValueError):
         write_stage_result_to_memory(result)
+
+
+@pytest.mark.parametrize("rel", ["..\\escape.csv", "C:\\outside.csv", "C:/outside.csv", "\\rooted.csv"])
+def test_rejected_windows_keys_would_escape_a_windows_out_dir(rel) -> None:
+    # Why the forms above are rejected: joined to a Windows output dir they
+    # leave it, so the check cannot rely on the host's path flavour.
+    root = PureWindowsPath("C:/output")
+    joined = ntpath.normpath(str(root / rel))
+    assert not joined.lower().startswith(ntpath.normpath(str(root)).lower() + "\\")
 
 
 def test_package_versions_names_the_core_packages() -> None:

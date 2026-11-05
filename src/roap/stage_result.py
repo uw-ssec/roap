@@ -25,7 +25,7 @@ import io
 import json
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -90,9 +90,23 @@ def _parquet_path(rel: str) -> str:
 
 
 def _check_rel(rel: str) -> str:
+    # Keys are forward-slash relative paths. The disk writer joins them with
+    # the native Path, so anything Windows reads as a drive, a root or a
+    # separator (``C:x``, ``\\x``, ``..\\x``) is rejected on every platform.
+    if not isinstance(rel, str):
+        raise ValueError(f"StageResult paths must be strings, got {rel!r}")
     path = PurePosixPath(rel)
-    if path.is_absolute() or ".." in path.parts or not path.suffix:
-        raise ValueError(f"StageResult paths must be relative file paths, got {rel!r}")
+    windows = PureWindowsPath(rel)
+    if (
+        "\\" in rel
+        or path.is_absolute()
+        or windows.drive
+        or windows.root
+        or ":" in rel
+        or any(part in ("", ".", "..") for part in rel.split("/"))
+        or not path.suffix
+    ):
+        raise ValueError(f"StageResult paths must be forward-slash relative file paths, got {rel!r}")
     return rel
 
 
