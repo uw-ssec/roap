@@ -6,6 +6,14 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 
 ## [Unreleased]
 
+### Added
+
+- Golden-baseline test: `tests/golden/example_data/` holds the pipeline's CSV
+  output on `examples/example_data.xlsx`, and `tests/test_golden_baseline.py`
+  fails when that output changes. Regenerate with
+  `pixi run python tools/golden_baseline.py` and list each intended difference
+  in the PR description (#37)
+
 ### Fixed
 
 - Stage 1B stores `is_sample_row` as a boolean again, so CRM and standard rows

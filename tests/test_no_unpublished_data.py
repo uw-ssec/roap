@@ -6,6 +6,7 @@ stays out of git history, where it could not be removed without a rewrite.
 """
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -14,6 +15,14 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ALLOWED_DATA_FILES = {"examples/example_data.xlsx"}
+
+# Pipeline output on the synthetic example workbook, kept as the golden
+# baseline (tests/golden/README.md). Derived from example_data.xlsx only. Only
+# CSVs at the paths the generator writes are allowed: a stage output directory,
+# then data/, tables/ or qc/. Anything else there is still unexpected data.
+GOLDEN_FIXTURE = re.compile(
+    r"^tests/golden/example_data/oa_\w+_outputs/(?:[\w.-]+/)?(?:data|tables|qc)/[\w.-]+\.csv$"
+)
 
 DATA_SUFFIXES = {".xlsx", ".xls", ".csv", ".parquet", ".nc", ".dat"}
 
@@ -37,15 +46,33 @@ def _tracked_files() -> list[str]:
     return [line for line in out.stdout.splitlines() if line]
 
 
-def test_no_unexpected_data_files_tracked() -> None:
-    tracked = _tracked_files()
+def _unexpected_data_files(tracked: list[str]) -> list[str]:
     data_files = {f for f in tracked if Path(f).suffix.lower() in DATA_SUFFIXES}
     # The prototype submodule is a separate repo with its own history; its
     # contents are covered by test_prototype_submodule_has_no_stored_outputs.
     data_files = {f for f in data_files if not f.startswith("references/")}
+    data_files = {f for f in data_files if not GOLDEN_FIXTURE.match(f)}
+    return sorted(data_files - ALLOWED_DATA_FILES)
 
-    unexpected = sorted(data_files - ALLOWED_DATA_FILES)
+
+def test_no_unexpected_data_files_tracked() -> None:
+    unexpected = _unexpected_data_files(_tracked_files())
     assert not unexpected, f"Unpublished data files tracked in git: {unexpected}"
+
+
+def test_golden_exemption_covers_only_fixture_csvs() -> None:
+    fixture = "tests/golden/example_data/oa_stage4_outputs/data/analysis_ready.csv"
+    qc_fixture = "tests/golden/example_data/oa_prelim_data__qc_outputs/sheet_oa_data/qc/ta_crm_qc.csv"
+    rejected = [
+        "tests/golden/example_data/cruise.xlsx",
+        "tests/golden/example_data/oa_stage4_outputs/data/cruise.xlsx",
+        "tests/golden/example_data/oa_stage4_outputs/data/analysis_ready.parquet",
+        "tests/golden/example_data/notes.csv",
+        "tests/golden/example_data/oa_stage4_outputs/reports/summary.csv",
+        "tests/golden/example_data/oa_stage4_outputs/a/b/data/deep.csv",
+        "tests/golden/other/oa_stage4_outputs/data/analysis_ready.csv",
+    ]
+    assert _unexpected_data_files([fixture, qc_fixture, *rejected]) == sorted(rejected)
 
 
 @pytest.mark.xfail(

@@ -1,0 +1,10 @@
+logical_variable,column_used,min_allowed,max_allowed,n,n_valid,n_missing,n_non_numeric,n_below_min,n_above_max,n_flagged
+salinity,salinity,0.0,42.0,27,27,0,0,0,1,1
+temperature,temperature_insitu_c,-2.0,40.0,27,20,7,0,0,0,0
+observed_ph,ph_best,6.0,9.5,27,27,0,0,0,0,0
+co2sys_ph,ph_co2sys,6.0,9.5,27,20,7,0,0,0,0
+alkalinity,ta_best_umolkg,0.0,3500.0,27,24,3,0,0,0,0
+dic,dic_best_umol_kg,0.0,3500.0,27,20,7,0,0,0,0
+pco2,pco2_best_uatm,0.0,10000.0,27,20,7,0,0,0,0
+omega_aragonite,omega_aragonite_calc,0.0,20.0,27,0,27,0,0,0,0
+omega_calcite,omega_calcite_calc,0.0,20.0,27,0,27,0,0,0,0

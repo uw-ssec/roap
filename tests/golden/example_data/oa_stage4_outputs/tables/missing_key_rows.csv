@@ -1,0 +1,9 @@
+record_id,sample_id,cruise_id,transect_id,station_id,replicate_id,depth_round_m,sample_date,sample_month,flag_missing_key__sample_id,flag_missing_key__sample_date,flag_missing_key__station_id,flag_missing_key__depth_round_m
+S007,,VISS-EX-2024,T1,V03,r1,10.0,2024-03-07 00:00:00+00:00,2024-03,True,False,False,False
+RM213_1,,VISS-EX-2024,,,r1,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+RM213_2,,VISS-EX-2024,,,r2,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+RM213_3,,VISS-EX-2024,,,r3,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+RM213_4,,VISS-EX-2024,,,r4,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+TRIS_1,,VISS-EX-2024,,,r1,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+TRIS_2,,VISS-EX-2024,,,r2,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True
+TRIS_3,,VISS-EX-2024,,,r3,,2024-03-15 00:00:00+00:00,2024-03,True,False,True,True

@@ -1,0 +1,3 @@
+record_id,sample_id,dic_best_umol_kg,co2aq_calc_umol_kg,hco3_calc_umol_kg,co3_calc_umol_kg,dic_sum_species,dic_minus_species_sum,dic_tol_used,flag_dic_unit_missing,flag_dic_unit_mismatch,flag_dic_nonpositive,flag_co2aq_negative,flag_hco3_negative,flag_co3_negative,flag_any_negative_species,flag_dic_inconsistent,flag_dic_inconsistent_robust
+S010,OA-2024-010,2081.97,217.25,1899.33,165.39,2281.97,-200.0,20.819699999999997,False,False,False,False,False,False,False,True,False
+S015,OA-2024-015,2111.79,19.7,-50.0,148.85,118.55,1993.24,21.1179,False,False,False,False,True,False,True,True,False
