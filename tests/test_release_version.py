@@ -2,7 +2,6 @@
 
 import datetime as dt
 import importlib.util
-import shutil
 from pathlib import Path
 
 import pytest
@@ -50,26 +49,33 @@ def test_dev_versions_increase_across_a_release() -> None:
     assert Version(before) < Version("2026.11.0") < Version(after)
 
 
-def test_write_version_stamps_only_project_version(tmp_path: Path) -> None:
-    pyproject = tmp_path / "pyproject.toml"
-    shutil.copy(REPO_ROOT / "pyproject.toml", pyproject)
-    original = pyproject.read_text(encoding="utf-8")
-    rv.write_version("2026.11.0.dev3", pyproject)
-    assert rv.pyproject_version(pyproject) == "2026.11.0.dev3"
-    changed = [
-        (a, b)
-        for a, b in zip(original.splitlines(), pyproject.read_text(encoding="utf-8").splitlines())
-        if a != b
-    ]
-    assert len(changed) == 1, changed
-
-
 def test_check_tag() -> None:
-    rv.check_tag("v2026.11.0", "2026.11.0")
-    with pytest.raises(SystemExit, match="does not match"):
-        rv.check_tag("v2026.11.1", "2026.11.0")
-    with pytest.raises(SystemExit):
-        rv.check_tag("2026.11.0", "2026.11.0")
+    rv.check_tag("v2026.11.0")
+    rv.check_tag("v2026.09.12")
+    for bad in ("2026.11.0", "v2026.9.0", "v2026.13.0", "v2026.11", "v2026.11.0rc1"):
+        with pytest.raises(SystemExit):
+            rv.check_tag(bad)
+
+
+def _dist(tmp_path: Path, *names: str) -> Path:
+    tmp_path.mkdir(exist_ok=True)
+    for name in names:
+        (tmp_path / name).touch()
+    return tmp_path
+
+
+def test_check_dist_accepts_tag_version_with_normalized_month(tmp_path: Path) -> None:
+    dist = _dist(tmp_path, "roap-2026.9.0.tar.gz", "roap-2026.9.0-py3-none-any.whl")
+    assert len(rv.check_dist("v2026.09.0", dist)) == 2
+
+
+def test_check_dist_rejects_wrong_or_missing_version(tmp_path: Path) -> None:
+    dev = _dist(tmp_path / "dev", "roap-2026.11.1.dev3.tar.gz", "roap-2026.11.1.dev3-py3-none-any.whl")
+    with pytest.raises(SystemExit, match="is not version"):
+        rv.check_dist("v2026.11.0", dev)
+    wheel_only = _dist(tmp_path / "wheel", "roap-2026.11.0-py3-none-any.whl")
+    with pytest.raises(SystemExit, match="one sdist and one wheel"):
+        rv.check_dist("v2026.11.0", wheel_only)
 
 
 def test_publish_workflow_routes_main_to_testpypi_and_release_to_pypi() -> None:
@@ -95,5 +101,8 @@ def test_publish_workflow_routes_main_to_testpypi_and_release_to_pypi() -> None:
     assert "repository-url" not in prod_publish.get("with", {})
 
     build_runs = "\n".join(s.get("run", "") for s in jobs["build"]["steps"])
-    assert "release_version.py dev --write" in build_runs
+    assert "release_version.py dev" in build_runs
+    assert "SETUPTOOLS_SCM_PRETEND_VERSION" in build_runs
+    assert "--write" not in build_runs
     assert "release_version.py check-tag" in build_runs
+    assert "release_version.py check-dist" in build_runs

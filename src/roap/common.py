@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
+from packaging.version import InvalidVersion, Version
 
 __all__ = [
     "die",
@@ -994,7 +995,14 @@ def check_config_compatibility(config: dict, config_name: str) -> None:
     required = config.get("compatible_pipeline_version")
     if required:
         current = pkg_version("roap")
-        if not _version_satisfies(current, required):
+        try:
+            satisfied = _version_satisfies(current, required)
+        except InvalidVersion as exc:
+            raise SystemExit(
+                f"Config '{config_name}' has an invalid compatible_pipeline_version "
+                f"{required!r}: {exc}"
+            ) from exc
+        if not satisfied:
             raise SystemExit(
                 f"Config '{config_name}' requires pipeline version {required}, "
                 f"but current version is {current}. Update config or downgrade pipeline."
@@ -1002,17 +1010,13 @@ def check_config_compatibility(config: dict, config_name: str) -> None:
 
 
 def _version_satisfies(current: str, required: str) -> bool:
+    # PEP 440 ordering: CalVer (2026.11.0) sorts after the legacy SemVer
+    # (0.2.0), zero-padding is ignored (2026.09.0 == 2026.9.0), and a git build
+    # between tags (2026.11.1.dev3, from hatch-vcs) sorts before its release.
+    # Raises InvalidVersion for a malformed version on either side.
     if required.startswith(">="):
-        min_ver = required[2:]
-        return _parse_version(current) >= _parse_version(min_ver)
+        return Version(current) >= Version(required[2:].strip())
 
     if required.startswith("=="):
-        exact_ver = required[2:]
-        return _parse_version(current) == _parse_version(exact_ver)
+        return Version(current) == Version(required[2:].strip())
     return True
-
-
-def _parse_version(v: str) -> tuple:
-    # Compare every numeric component so CalVer (2026.11.0) and the legacy
-    # SemVer (0.2.0) order correctly; int() also drops zero-padding (2026.09.0).
-    return tuple(map(int, v.strip().split(".")))

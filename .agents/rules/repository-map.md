@@ -57,11 +57,13 @@ files for security issues. Changes to anything under `.github/workflows/` must
 keep this check passing.
 
 **Publishing:** `.github/workflows/publish.yml` builds the sdist and wheel in
-the `build` Pixi environment. A push to `main` stamps a CalVer dev version
-(`YYYY.0M.MICRO.devN`, from `tools/release_version.py`) and uploads to TestPyPI.
-A published GitHub Release checks that the tag equals `v` + the `pyproject.toml`
-version and uploads to PyPI. Both use PyPI trusted publishing through the
-`testpypi` and `pypi` environments; no tokens are stored in the repository.
+the `build` Pixi environment. hatch-vcs takes the version from the git tag;
+neither `pyproject.toml` nor `pixi.toml` hardcodes one. A push to `main` builds
+a CalVer dev version (`YYYY.0M.MICRO.devN`, from `tools/release_version.py`) and
+uploads to TestPyPI. A published GitHub Release checks that the tag is
+`vYYYY.0M.MICRO` and that the built sdist and wheel carry that version, then
+uploads to PyPI. Both use PyPI trusted publishing through the `testpypi` and
+`pypi` environments; no tokens are stored in the repository.
 
 **Copilot cloud agent:** `.github/workflows/copilot-setup-steps.yml` prepares
 the GitHub Copilot coding agent's environment (pixi install from `pixi.lock`,

@@ -33,12 +33,16 @@ jobs:
           pixi-version: "latest"
           environments: build
 
-      - name: Stamp dev version
+      # hatch-vcs reads the version from the git tag. For main, pin it to the
+      # CalVer dev version so a new month starts at YYYY.0M.0.devN.
+      - name: Set dev version
         if: github.event_name == 'push'
-        run: pixi run -e build python tools/release_version.py dev --write
+        run: |
+          version=$(pixi run -e build python tools/release_version.py dev)
+          echo "SETUPTOOLS_SCM_PRETEND_VERSION=$version" >> "$GITHUB_ENV"
         shell: bash
 
-      - name: Check release tag matches pyproject.toml
+      - name: Check release tag is CalVer
         if: github.event_name == 'release'
         run: pixi run -e build python tools/release_version.py check-tag "$TAG"
         shell: bash
@@ -48,6 +52,15 @@ jobs:
       - name: Build sdist and wheel
         run: pixi run -e build build-dist
         shell: bash
+
+      - name: Check distributions carry the release tag's version
+        if: github.event_name == 'release'
+        run:
+          pixi run -e build python tools/release_version.py check-dist "$TAG"
+          dist
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
 
       - name: Upload distributions
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

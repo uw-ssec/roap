@@ -39,13 +39,14 @@ jobs:
       - name: Check out repository
         uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1
         with:
+          fetch-depth: 0 # tags: hatch-vcs derives the roap version from them
           persist-credentials: false
 
       # Keep pixi-version in sync with PIXI_VERSION in .devcontainer/Dockerfile.
       - name: Install pixi and the default environment
         uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
-          pixi-version: v0.81.0
+          pixi-version: v0.84.1
           cache: true
           locked: true
           activate-environment: true

@@ -104,8 +104,7 @@ Adding a dependency to this template needs justification — see
 
 ## pixi.toml Structure
 
-- **`[workspace]`**: Project metadata (name, version, authors, platforms,
-  channels)
+- **`[workspace]`**: Project metadata (name, authors, platforms, channels)
 - **`[environments]`**: Named environments with feature sets
 - **`[dependencies]`**: Conda dependencies for all environments
 - **`[pypi-dependencies]`**: PyPI dependencies for all environments

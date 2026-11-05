@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: true
+          fetch-depth: 0 # tags: hatch-vcs derives the roap version from them
 
       - name: Set up Python 3.11
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -38,7 +39,18 @@ jobs:
           activate-environment: true
 
       - name: Install dependencies
-        run: pixi install
+        run: pixi install --locked
+        shell: bash
+
+      # Before the first reachable release tag, hatch-vcs defaults to 0.1.devN,
+      # below the shipped configs' >=0.2.0 requirement. Exercise the same CalVer
+      # dev version as publishing until tag-derived versions are available.
+      - name: Bootstrap untagged development version
+        run: |
+          if ! git describe --tags --match 'v[0-9]*' --abbrev=0 >/dev/null 2>&1; then
+            version=$(python tools/release_version.py dev)
+            SETUPTOOLS_SCM_PRETEND_VERSION="$version" pixi reinstall --locked roap
+          fi
         shell: bash
 
       - name: Cache pre-commit hooks

@@ -10,16 +10,21 @@ def test_changelog_exists_and_format():
 
 
 def test_version_consistency():
-    """pyproject.toml, package metadata, and the newest CHANGELOG release agree."""
+    """A tagged build's version matches the newest CHANGELOG release.
+
+    hatch-vcs takes the version from the git tag. Between tags it is a .devN
+    pre-release that sorts after the newest CHANGELOG release, and a shallow
+    clone without tags has no released version to compare.
+    """
     import re
-    import tomli
     from importlib.metadata import version as pkg_version
     from pathlib import Path
     from packaging.version import Version
-    pyproject_version = tomli.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    init_version = pkg_version("roap")
+    installed = Version(pkg_version("roap"))
     content = Path("CHANGELOG.md").read_text(encoding="utf-8")
     released = re.findall(r"^## \[(\d[^\]]*)\]", content, flags=re.MULTILINE)
     assert released, "No released version in CHANGELOG.md"
-    # Metadata normalizes zero-padding (2026.09.0 -> 2026.9.0); compare as versions.
-    assert Version(pyproject_version) == Version(init_version) == Version(released[0])
+    newest = Version(released[0])
+    if not installed.is_devrelease:
+        # Metadata normalizes zero-padding (2026.09.0 -> 2026.9.0); compare as versions.
+        assert installed == newest

@@ -24,6 +24,9 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
   `v2026.11.0`
 - Config compatibility gate compares every version component, so CalVer releases
   and same-month MICRO releases order correctly
+- The package version comes from the `vYYYY.0M.MICRO` git tag (hatchling and
+  hatch-vcs replace setuptools); `pyproject.toml` and `pixi.toml` no longer
+  hardcode it, and a release needs no version-bump commit
 
 ### Fixed
 
