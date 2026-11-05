@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """CalVer versions for the publish workflow (.github/workflows/publish.yml).
 
-Releases are ``YYYY.0M.MICRO`` (see CHANGELOG.md). Builds of ``main`` go to
-TestPyPI as a pre-release of the next release, ``YYYY.0M.MICRO.devN``, where N
-counts commits since the last tag.
+Releases are ``YYYY.0M.MICRO`` (see CHANGELOG.md), and the package version
+comes from the ``vYYYY.0M.MICRO`` git tag through hatch-vcs (pyproject.toml).
+Builds of ``main`` go to TestPyPI as a pre-release of the next release,
+``YYYY.0M.MICRO.devN``, where N counts commits since the last tag.
 
-    pixi run -e build python tools/release_version.py dev [--write]
+    pixi run -e build python tools/release_version.py dev
     pixi run -e build python tools/release_version.py check-tag v2026.11.0
+    pixi run -e build python tools/release_version.py check-dist v2026.11.0 dist
 
-``dev`` prints the dev version; ``--write`` also stamps it into
-pyproject.toml (CI only; the committed file keeps the release version).
-``check-tag`` fails unless the tag is ``v`` + the pyproject.toml version.
+``dev`` prints the dev version; the publish workflow passes it to hatch-vcs as
+``SETUPTOOLS_SCM_PRETEND_VERSION`` so dev builds roll over to the new month.
+``check-tag`` fails unless the tag is ``vYYYY.0M.MICRO``. ``check-dist`` fails
+unless every sdist and wheel in the directory carries the tag's version.
 """
 
 from __future__ import annotations
@@ -20,12 +23,12 @@ import datetime as dt
 import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
-PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
-CALVER_TAG = re.compile(r"^v(\d{4})\.(\d{2})\.(\d+)$")
-VERSION_LINE = re.compile(r'^version = "[^"]*"$', re.MULTILINE)
+from packaging.version import Version
+
+CALVER_TAG = re.compile(r"^v(\d{4})\.(0[1-9]|1[0-2])\.(\d+)$")
+DIST_NAME = re.compile(r"^roap-(?P<version>[^-]+?)(?:-py3-none-any\.whl|\.tar\.gz)$")
 
 
 def next_release(today: dt.date, tags: list[str]) -> str:
@@ -57,36 +60,34 @@ def _commits_since_last_tag() -> int:
     return int(_git("rev-list", "--count", f"{last}..HEAD"))
 
 
-def pyproject_version(path: Path = PYPROJECT) -> str:
-    with path.open("rb") as f:
-        return tomllib.load(f)["project"]["version"]
+def check_tag(tag: str) -> None:
+    if not CALVER_TAG.match(tag):
+        raise SystemExit(f"tag {tag!r} is not a CalVer release tag (expected 'vYYYY.0M.MICRO')")
 
 
-def write_version(version: str, path: Path = PYPROJECT) -> None:
-    text = path.read_text(encoding="utf-8")
-    new, count = VERSION_LINE.subn(f'version = "{version}"', text, count=1)
-    if count != 1:
-        raise SystemExit(f"no 'version = \"...\"' line in {path}")
-    path.write_text(new, encoding="utf-8")
-    if pyproject_version(path) != version:
-        raise SystemExit(f"stamped the wrong version line in {path}")
-
-
-def check_tag(tag: str, version: str) -> None:
-    if tag != f"v{version}":
-        raise SystemExit(
-            f"tag {tag!r} does not match pyproject.toml version {version!r} "
-            f"(expected 'v{version}')"
-        )
+def check_dist(tag: str, dist: Path) -> list[str]:
+    """Fail unless dist/ holds an sdist and a wheel, all versioned as the tag."""
+    expected = Version(tag.removeprefix("v"))
+    names = sorted(p.name for p in dist.iterdir() if p.suffix in {".whl", ".gz"})
+    kinds = {name.endswith(".whl") for name in names}
+    if kinds != {True, False}:
+        raise SystemExit(f"expected one sdist and one wheel in {dist}, found {names}")
+    for name in names:
+        m = DIST_NAME.match(name)
+        if not m or Version(m.group("version")) != expected:
+            raise SystemExit(f"{name} is not version {expected} (tag {tag!r})")
+    return names
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    dev = sub.add_parser("dev", help="print the dev version for this commit")
-    dev.add_argument("--write", action="store_true", help="stamp it into pyproject.toml")
-    tag = sub.add_parser("check-tag", help="fail unless TAG == v<pyproject version>")
+    sub.add_parser("dev", help="print the dev version for this commit")
+    tag = sub.add_parser("check-tag", help="fail unless TAG is vYYYY.0M.MICRO")
     tag.add_argument("tag")
+    dist = sub.add_parser("check-dist", help="fail unless DIST holds TAG's sdist and wheel")
+    dist.add_argument("tag")
+    dist.add_argument("dist", type=Path)
     args = parser.parse_args(argv)
 
     if args.command == "dev":
@@ -95,12 +96,13 @@ def main(argv: list[str] | None = None) -> int:
             _git("tag", "--list", "v*").split(),
             _commits_since_last_tag(),
         )
-        if args.write:
-            write_version(version)
         print(version)
+    elif args.command == "check-tag":
+        check_tag(args.tag)
+        print(f"{args.tag} is a CalVer release tag")
     else:
-        check_tag(args.tag, pyproject_version())
-        print(f"{args.tag} matches pyproject.toml")
+        for name in check_dist(args.tag, args.dist):
+            print(f"{name} matches {args.tag}")
     return 0
 
 

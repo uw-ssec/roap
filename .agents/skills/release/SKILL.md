@@ -36,17 +36,17 @@ None. The version is derived from today's date.
 
 5. Read `CHANGELOG.md` and check that the `[Unreleased]` section has content.
 
-6. Update `CHANGELOG.md` and `pyproject.toml`:
+6. Update `CHANGELOG.md`:
 
    - Rename `[Unreleased]` to `[YYYY.0M.MICRO] -- YYYY-MM-DD` (today's date)
    - Add a new empty `[Unreleased]` section above it
-   - Set `version = "YYYY.0M.MICRO"` in `pyproject.toml`, then run
-     `pixi install` so the editable install reports the new version
+   - Don't edit a version in `pyproject.toml` or `pixi.toml`: hatch-vcs reads it
+     from the tag created in step 8
 
 7. Commit the release preparation:
 
    ```bash
-   git add CHANGELOG.md pyproject.toml
+   git add CHANGELOG.md
    git commit -m "chore(release): prepare vYYYY.0M.MICRO" -m "Assisted-by: <harness>:<model>"
    ```
 
@@ -101,8 +101,8 @@ None. The version is derived from today's date.
     ```
 
     Publishing the release triggers `.github/workflows/publish.yml`, which
-    uploads the package to PyPI. That job fails unless the tag equals `v` + the
-    `pyproject.toml` version.
+    uploads the package to PyPI. That job fails unless the tag is
+    `vYYYY.0M.MICRO` and the built sdist and wheel carry that version.
 
 12. Clean up zip files from the repo root after successful upload.
 
@@ -121,7 +121,9 @@ note breaking changes in `CHANGELOG.md`.
 | Another release in the same month | `v2026.11.0` → `v2026.11.1` |
 | First release in a new month      | `v2026.11.1` → `v2026.12.0` |
 
-`pyproject.toml` holds the same string without the `v` (`2026.11.0`).
+The package version is the tag without the `v` (`2026.11.0`), set by hatch-vcs
+at build time. Package metadata drops month zero-padding (`2026.09.0` →
+`2026.9.0`).
 
 ## Zip Naming Rules
 

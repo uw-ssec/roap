@@ -1,2 +1,5 @@
 # SCM syntax highlighting & preventing 3-way merges
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+
+# hatch-vcs reads the version from this file in GitHub source archives
+.git_archival.txt export-subst

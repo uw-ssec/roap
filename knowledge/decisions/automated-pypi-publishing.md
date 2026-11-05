@@ -21,10 +21,13 @@ publishing to PyPI on 2026-10-26 (maintainer direction).
 
 - **Every push to `main`** builds a dev pre-release of the next release,
   `YYYY.0M.MICRO.devN`, and uploads it to TestPyPI. N is the number of commits
-  since the last `v*` tag. The version is stamped into the build only.
-  `pyproject.toml` keeps the release version written by the release skill.
-- **A published GitHub Release** fails unless its tag equals `v` + the
-  `pyproject.toml` version, and otherwise uploads to PyPI.
+  since the last `v*` tag. The workflow passes it to hatch-vcs as
+  `SETUPTOOLS_SCM_PRETEND_VERSION`.
+- **The version comes from the git tag** (hatchling + hatch-vcs, 2026-11-05).
+  `pyproject.toml` declares `dynamic = ["version"]` and `pixi.toml` has no
+  workspace version, so a release needs no version-bump commit.
+- **A published GitHub Release** fails unless its tag is `vYYYY.0M.MICRO` and
+  the built sdist and wheel carry that version, and otherwise uploads to PyPI.
 - Both uploads use PyPI trusted publishing (OIDC) through the `testpypi` and
   `pypi` GitHub environments. No API tokens are stored.
 - Workflow hardening: actions are pinned to commit SHAs, top-level

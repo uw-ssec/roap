@@ -5,13 +5,13 @@
 # =====================================================================
 
 [build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.26", "hatch-vcs>=0.4"]
+build-backend = "hatchling.build"
 
 
 [project]
 name = "roap"
-version = "2026.11.0"
+dynamic = ["version"]
 description = "Reproducible Ocean Acidification Pipeline (ROAP) - ocean acidification quality control and processing platform"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -60,6 +60,8 @@ dependencies = [
     "ipython>=8.0,<10.0",
     "hypothesis>=6.0,<7.0",
     "typer>=0.12,<1.0",
+    # PEP 440 comparison for the compatible_pipeline_version config gate.
+    "packaging>=23.0",
     # Carbonate chemistry engine. Required by roap.carbonate_calc, which
     # notebook 08_stage4 imports unconditionally when carbonate calculation is
     # enabled — a pip install without this cannot do the core science.
@@ -86,21 +88,38 @@ Documentation = "https://github.com/uw-ssec/roap#readme"
 Issues = "https://github.com/uw-ssec/roap/issues"
 
 
-[project.entry-points."console_scripts"]
+[project.scripts]
 roap = "roap.cli:app"
 
 
 # =====================================================================
-# Setuptools configuration -- src/roap package
+# Hatch configuration -- src/roap package, version from the git tag
 # =====================================================================
+# The version comes from the latest vYYYY.0M.MICRO tag via hatch-vcs: a
+# build of tag v2026.11.0 is 2026.11.0, and a later commit is a .devN
+# pre-release of the next version. Releases need no version-bump commit.
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[tool.hatch.version]
+source = "vcs"
 
+[tool.hatch.version.raw-options]
+# PyPI and TestPyPI reject local versions (+g<sha>).
+local_scheme = "no-local-version"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["roap*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/roap"]
+
+# Keep the sdist to the package and its tests, as the setuptools build did;
+# hatchling otherwise ships every tracked file.
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/roap",
+    "/tests",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/CITATION.cff",
+]
 
 
 # =====================================================================

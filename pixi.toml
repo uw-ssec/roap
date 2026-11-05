@@ -4,7 +4,6 @@ authors = ["University of Washington Scientific Software Engineering Center"] # 
 channels = ["conda-forge", "https://prefix.dev/lsetiawan/uw-ssec"] # Conda channels for dependencies; okf-agent-memory falls back to the second channel on platforms conda-forge doesn't build yet (osx-arm64, linux-aarch64)
 name = "roap" # Project name
 platforms = ["osx-arm64", "linux-64", "linux-aarch64", "win-64"] # Supported platforms for development and deployment
-version = "2026.11.0" # Project version; must match pyproject.toml (tests/test_version.py)
 
 # The environment configurations for different development scenarios
 [environments]
@@ -34,6 +33,7 @@ ruff = ">=0.5.0,<1.0"
 black = ">=24.0,<25.0"
 mypy = ">=1.10,<2.0"
 typer = ">=0.12,<1.0"
+packaging = ">=23.0"
 jupyterlab = ">=4,<5"
 
 # The project dependencies from PyPI
@@ -87,8 +87,8 @@ onboard = { cmd = "ssec onboard", description = "Run the onboarding process for 
 [feature.build.dependencies]
 python = ">=3.11,<3.12"
 python-build = ">=1.2"
-setuptools = ">=64"
-wheel = "*"
+hatchling = ">=1.26"
+hatch-vcs = ">=0.4"
 twine = ">=6.0"
 
 [feature.build.tasks]
