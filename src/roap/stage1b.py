@@ -20,27 +20,39 @@ explicitly supplies a real default in configuration.
 from __future__ import annotations
 
 import sys
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import pandas as pd
 
 from . import row_roles
 from .common import (
+    build_flag_summary,
     coalesce_numeric_series,
     coalesce_string_series,
     coerce_datetime,
+    coerce_numeric,
     empty_float_series,
     empty_string_series,
     existing_columns,
     first_existing,
+    make_missingness_table,
+    md_table_from_df,
     percent_missing,
     safe_str_series,
     safe_upper,
+    utc_stamp,
+    value_counts_frame,
 )
 from .policy import RangePolicy
 from .schema import normalize_ph_scale, normalize_ta_units
+from .stage_result import StageResult, json_text, package_versions
+
+if TYPE_CHECKING:
+    from .stage_config import StageConfig
 
 __all__ = [
+    "NOTEBOOK",
     "STAGE1B_DEFAULTS",
     "build_numeric_candidates_for_stage1b",
     "add_status_normalizations",
@@ -52,7 +64,10 @@ __all__ = [
     "add_analysis_range_flags",
     "analysis_ready_subset",
     "provenance_counts_table",
+    "run",
 ]
+
+NOTEBOOK = "05_stage1b"
 
 
 # =============================================================================
@@ -979,3 +994,197 @@ def provenance_counts_table(df: pd.DataFrame) -> pd.DataFrame:
             )
 
     return pd.DataFrame(rows)
+
+
+# =============================================================================
+# Stage run (#42)
+# =============================================================================
+
+
+def _count_true(df: pd.DataFrame, col: str) -> Optional[int]:
+    return int((df[col] == True).sum()) if col in df.columns else None  # noqa: E712
+
+
+def run(df: pd.DataFrame, stage_config: "StageConfig", *, source: Optional[str] = None) -> StageResult:
+    """Run Stage 1B on Stage 1A's staged frame; no disk IO.
+
+    ``source`` labels the input (e.g. the staged.csv path) in the frame's
+    ``source_file_stage1b`` column, the report and the run bundle. Raises
+    ``ValueError`` for an empty frame or another Stage's config.
+    """
+    if stage_config.stage != "stage1b":
+        raise ValueError(f"Stage 1B needs the stage1b config, got {stage_config.stage}.")
+    if df.empty:
+        raise ValueError(f"Stage 1B input is empty: {source or '<frame>'}")
+    config, range_policy = stage_config.config, stage_config.range_policy
+
+    df = df.copy()
+    df["source_file_stage1b"] = str(source) if source is not None else ""
+    df["stage1b_processed_utc"] = utc_stamp()
+    if "sample_date" in df.columns:
+        coerce_datetime(df, "sample_date")
+    coerce_numeric(df, build_numeric_candidates_for_stage1b(config))
+
+    meta = add_best_analysis_fields(df, config)
+    status_meta = add_status_normalizations(df, config)
+    provenance_meta = add_provenance_fields(df, config)
+    unit_meta = validate_ta_units(df)
+    add_scale_flags(df)
+    add_presence_flags(df)
+    add_analysis_range_flags(df, policy=range_policy)
+
+    missing_tbl = make_missingness_table(df)
+    df_ready = analysis_ready_subset(df, config)
+
+    manifest = {
+        "notebook": NOTEBOOK,
+        "generated_utc": utc_stamp(),
+        "input_csv": source,
+        "config_source": stage_config.source,
+        "config_warnings": list(stage_config.warnings),
+        "parameters": {},
+        "policy": {
+            "range_policy": asdict(range_policy),
+            "ta_precedence": config.get("ta_precedence", []),
+            "ph_precedence": config.get("ph_precedence", []),
+            "ph_co2sys_candidates": config.get("ph_co2sys_candidates", []),
+            "pco2_precedence": config.get("pco2_precedence", []),
+            "dic_precedence": config.get("dic_precedence", []),
+            "analysis_policy": config.get("analysis_policy", {}),
+            "provenance_defaults": config.get("provenance_defaults", {}),
+            "variable_roles": config.get("variable_roles", {}),
+        },
+        "field_sources": {**meta, **status_meta, **unit_meta, **provenance_meta},
+        "row_counts": {
+            "analysis_fields_rows": int(len(df)),
+            "analysis_ready_rows": int(len(df_ready)),
+            "sample_rows": _count_true(df, "is_sample_row"),
+            "rows_missing_ta_units": _count_true(df, "flag_ta_units_missing"),
+            "rows_unexpected_ta_units": _count_true(df, "flag_ta_units_unexpected"),
+            "rows_missing_observed_ph_scale": _count_true(df, "flag_ph_scale_observed_missing"),
+            "rows_missing_pressure_output_dbar": _count_true(df, "flag_pressure_output_dbar_missing"),
+            "rows_safe_for_analysis_qc": (
+                int(df_ready["safe_for_analysis_qc"].sum()) if "safe_for_analysis_qc" in df_ready.columns else None
+            ),
+            "rows_safe_for_analysis_strict": (
+                int(df_ready["safe_for_analysis_strict"].sum())
+                if "safe_for_analysis_strict" in df_ready.columns
+                else None
+            ),
+        },
+        "package_versions": package_versions(),
+    }
+    return StageResult(
+        stage="stage1b",
+        data={"data/analysis_fields.csv": df, "data/analysis_ready_samples.csv": df_ready},
+        tables={"logs/missingness.csv": missing_tbl},
+        reports={"reports/report.md": _report(df, df_ready, source, config, range_policy, meta, provenance_meta, missing_tbl)},
+        texts={"logs/effective_config.json": json_text(config)},
+        manifest=manifest,
+        input_file=source,
+        config_files=[stage_config.source],
+        bundle_name=NOTEBOOK,
+    )
+
+
+def _report(df, df_ready, source, config, range_policy, meta, provenance_meta, missing_tbl) -> str:
+    flag_summary = build_flag_summary(df)
+    prov_df = provenance_counts_table(df)
+
+    def blocks(pairs, empty: str) -> str:
+        found = [
+            f"### {title}\n{md_table_from_df(value_counts_frame(df, col))}"
+            for col, title in pairs
+            if col in df.columns
+        ]
+        return "\n\n".join(found) if found else empty
+
+    qc_text = blocks(
+        [
+            ("ta_qc_status", "TA QC status distribution"),
+            ("ph_qc_status", "Observed pH QC status distribution"),
+            ("phstd_status", "pH standard QC status distribution"),
+        ],
+        "_(No QC status columns found.)_",
+    )
+    source_text = blocks(
+        [
+            ("ta_best_source", "Best TA source distribution"),
+            ("ph_best_source", "Best observed pH source distribution"),
+            ("pco2_best_source", "Best pCO2 source distribution"),
+            ("dic_best_source", "Best DIC source distribution"),
+        ],
+        "_(No source columns found.)_",
+    )
+    ap = config.get("analysis_policy", {})
+    phstd_note = (
+        "FAILED pH standards block corrected-observed-pH rows in safe_for_analysis_qc."
+        if ap.get("phstd_fail_blocks_corrected_ph")
+        else "FAILED pH standards are kept as a diagnostic; do not block by default."
+    )
+    pressure_note = (
+        "Pressure is required for safe_for_analysis_strict."
+        if ap.get("require_pressure_for_strict")
+        else "Pressure remains a provenance / warning field by default."
+    )
+    n_qc = int(df_ready["safe_for_analysis_qc"].sum()) if "safe_for_analysis_qc" in df_ready.columns else 0
+    n_strict = int(df_ready["safe_for_analysis_strict"].sum()) if "safe_for_analysis_strict" in df_ready.columns else 0
+    return f"""# Stage 1B Report
+
+**Generated:** {utc_stamp()}
+**Source CSV:** `{source}`
+**Rows:** {len(df):,}
+**Columns:** {df.shape[1]:,}
+
+## What Stage 1B does
+1. Loads Stage 1A's staged.csv
+2. Builds best-source fields for TA, observed pH, calculated pH, pCO2, DIC
+3. Normalises QC status, TA units, pH scales
+4. Adds chemistry provenance + completeness flags
+5. Produces the sample-only analysis-ready subset
+
+## pH policy
+- `ph_best` precedence used: `{meta.get("ph_precedence_used", [])}`
+- `ph_co2sys` is kept SEPARATE from `ph_best` (observed measurement
+  chain vs CO2SYS-derived; downstream code can compare).
+- `phstd_status` policy: **{phstd_note}**
+
+## TA policy
+- `ta_best_umolkg` precedence used: `{meta.get("ta_precedence_used", [])}`
+- TA unit handling reads from the normalised `ta_units_normalized`.
+
+## Chemistry provenance summary
+- Carbonate solver: **{provenance_meta.get("carbonate_solver")}**
+- Carbon input pair: **{provenance_meta.get("carbon_input_pair_used")}**
+- Pressure rule: **{pressure_note}**
+
+{md_table_from_df(prov_df, max_rows=50) if not prov_df.empty else "_(No provenance summary available.)_"}
+
+## Source tracking
+{source_text}
+
+## Missingness inventory (top 50)
+{md_table_from_df(missing_tbl.head(50), max_rows=200)}
+
+## Range policy used
+- TA: {range_policy.ta_min} to {range_policy.ta_max} umol/kg
+- pH: {range_policy.ph_min} to {range_policy.ph_max}
+- Salinity: {range_policy.sal_min} to {range_policy.sal_max}
+- Depth: {range_policy.depth_min} to {range_policy.depth_max} m
+
+## Flag summary
+{md_table_from_df(flag_summary, max_rows=200) if not flag_summary.empty else "_(No flags were added.)_"}
+
+## QC rollups
+{qc_text}
+
+## Analysis subset summary
+- Sample rows: **{_count_true(df, "is_sample_row") or 0}**
+- Analysis-ready rows: **{len(df_ready):,}**
+- Rows safe_for_analysis_qc: **{n_qc}**
+- Rows safe_for_analysis_strict: **{n_strict}**
+
+## Main outputs
+- `data/analysis_fields.csv`: every row with the best fields
+- `data/analysis_ready_samples.csv`: Sample rows only (Stage 2 reads this)
+"""

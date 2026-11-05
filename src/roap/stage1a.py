@@ -8,7 +8,6 @@ writes the result with ``roap.stage_result.write_stage_result``.
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 from typing import Optional, Sequence
 
@@ -33,7 +32,7 @@ from .schema import (
     choose_duplicate_keys,
 )
 from .stage_config import StageConfig
-from .stage_result import StageResult, package_versions
+from .stage_result import StageResult, json_text, package_versions
 
 __all__ = ["NOTEBOOK", "run"]
 
@@ -137,8 +136,8 @@ def run(
         },
         reports={"reports/report.md": report},
         texts={
-            "logs/effective_config.json": _json_text(config),
-            "logs/source_lookup.json": _json_text(source_lookup),
+            "logs/effective_config.json": json_text(config),
+            "logs/source_lookup.json": json_text(source_lookup),
         },
         manifest=manifest,
         input_file=source,
@@ -146,10 +145,6 @@ def run(
         bundle_name=NOTEBOOK,
     )
 
-
-def _json_text(obj) -> str:
-    # Same layout as roap.common.write_json.
-    return json.dumps(obj, indent=2, ensure_ascii=False, default=str)
 
 def _report(
     df, source, stage_config, preserve, rename_audit, inventory, missing_tbl, dup_keys, n_dup

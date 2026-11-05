@@ -33,6 +33,7 @@ import pandas as pd
 __all__ = [
     "MANIFEST_PATH",
     "StageResult",
+    "json_text",
     "package_versions",
     "render_stage_result",
     "write_stage_result",
@@ -95,9 +96,13 @@ def _check_rel(rel: str) -> str:
     return rel
 
 
+def json_text(obj: Any) -> str:
+    """JSON text with the same layout as ``roap.common.write_json``."""
+    return json.dumps(obj, indent=2, ensure_ascii=False, default=str)
+
+
 def _json_bytes(obj: Any) -> bytes:
-    # Same layout as roap.common.write_json.
-    return json.dumps(obj, indent=2, ensure_ascii=False, default=str).encode("utf-8")
+    return json_text(obj).encode("utf-8")
 
 
 def _data_csv_bytes(df: pd.DataFrame) -> bytes:
