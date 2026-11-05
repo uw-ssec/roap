@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
+from . import row_roles
 from .common import die, first_existing, md_table_from_df, normalize_columns, utc_stamp
 from .schema import DEFAULT_CONFIG
 from .stage_result import StageResult, json_text, package_versions
@@ -630,13 +631,16 @@ def duplicate_check(
     df: pd.DataFrame,
     requested_keys: List[str],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
-    """Find duplicate key collisions only among rows with complete keys."""
+    """Find duplicate key collisions among Sample rows with complete keys.
+
+    Only Samples are grouped (#44); CRM and Standard rows are never duplicates.
+    """
     keys_used = [key for key in requested_keys if key in df.columns]
 
     if not keys_used:
         return pd.DataFrame(), pd.DataFrame(), []
 
-    complete_key = _complete_key_mask(df, keys_used)
+    complete_key = _complete_key_mask(df, keys_used) & row_roles.is_sample(df)
     dup_mask = pd.Series(False, index=df.index)
 
     if complete_key.any():
@@ -704,8 +708,9 @@ def add_duplicate_annotations(df: pd.DataFrame, keys_used: List[str]) -> pd.Data
     if missing:
         die(f"Duplicate key columns are missing: {missing}")
 
-    complete_key = _complete_key_mask(out, keys_used)
-    out["flag_duplicate_key_incomplete"] = (~complete_key).astype("boolean")
+    sample = row_roles.is_sample(out)
+    complete_key = _complete_key_mask(out, keys_used) & sample
+    out["flag_duplicate_key_incomplete"] = (~complete_key & sample).astype("boolean")
 
     if not complete_key.any():
         return out
@@ -725,7 +730,9 @@ def add_duplicate_annotations(df: pd.DataFrame, keys_used: List[str]) -> pd.Data
     ).astype("Int64")
     out.drop(columns=["duplicate_group_size_new"], inplace=True)
 
-    complete_after_merge = _complete_key_mask(out, keys_used)
+    # Non-Sample rows sharing a Sample's keys get no group (#44).
+    complete_after_merge = _complete_key_mask(out, keys_used) & row_roles.is_sample(out)
+    out.loc[~complete_after_merge, "duplicate_group_size"] = pd.NA
     out["flag_duplicate"] = (
         complete_after_merge & out["duplicate_group_size"].fillna(0).gt(1)
     ).astype("boolean")
@@ -894,17 +901,21 @@ def replicate_harmonise(
     List[str],
     pd.DataFrame,
 ]:
-    """Group rows into replicates and produce per group statistics."""
+    """Group Sample rows into replicates and produce per group statistics.
+
+    Only Samples are grouped (#44): CRM and Standard rows never join a
+    replicate group or its means, SDs and consistency checks.
+    """
     work = df.copy()
     keys_used = [key for key in requested_keys if key in work.columns]
 
     if not keys_used:
         die(f"No replicate group keys found in columns. Requested: {requested_keys}")
 
-    complete_group_key = _complete_key_mask(work, keys_used)
+    complete_group_key = _complete_key_mask(work, keys_used) & row_roles.is_sample(work)
 
     if not complete_group_key.any():
-        die("No rows have complete replicate group keys. Keys used: " + ", ".join(keys_used))
+        die("No Sample rows have complete replicate group keys. Keys used: " + ", ".join(keys_used))
 
     work_groupable = work.loc[complete_group_key].copy()
 
@@ -1065,8 +1076,9 @@ def add_replicate_annotations(
     if missing:
         die(f"Replicate group key columns are missing: {missing}")
 
+    sample = row_roles.is_sample(out)
     complete_key = _complete_key_mask(out, keys_used)
-    out["flag_replicate_group_key_incomplete"] = (~complete_key).astype("boolean")
+    out["flag_replicate_group_key_incomplete"] = (~complete_key & sample).astype("boolean")
 
     if nrep.empty:
         return out
@@ -1075,6 +1087,8 @@ def add_replicate_annotations(
     out = out.merge(merge_nrep, on=keys_used, how="left", sort=False)
 
     out["n_reps"] = pd.to_numeric(out["n_reps"], errors="coerce").astype("Int64")
+    # Non-Sample rows sharing a Sample group's keys are not in it (#44).
+    out.loc[~row_roles.is_sample(out), "n_reps"] = pd.NA
     out["replicate_group_n"] = out["n_reps"]
     out["flag_has_replicates"] = out["replicate_group_n"].fillna(0).gt(1).astype("boolean")
 
@@ -1162,8 +1176,11 @@ def add_conflict_annotations(
             ].fillna(False).astype("boolean")
             out.drop(columns=["flag_replicate_sd_exceeded_new"], inplace=True)
 
+    # Non-Sample rows sharing a Sample group's keys are not in it (#44).
+    non_sample = ~row_roles.is_sample(out)
     for col in flag_cols:
         out[col] = out[col].fillna(False).astype("boolean")
+        out.loc[non_sample, col] = False
 
     return out
 

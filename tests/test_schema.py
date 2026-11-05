@@ -201,6 +201,7 @@ class TestDuplicateKeys:
         """Rows with incomplete duplicate keys should not be flagged as duplicates."""
         df = pd.DataFrame(
             {
+                "row_role": "SAMPLE",
                 "sample_id": [pd.NA, pd.NA, "S3"],
                 "sample_date": [pd.NaT, pd.NaT, pd.Timestamp("2024-01-01")],
             }
@@ -222,6 +223,7 @@ class TestDuplicateKeys:
         """Blank strings in duplicate keys should be incomplete, not duplicates."""
         df = pd.DataFrame(
             {
+                "row_role": "SAMPLE",
                 "sample_id": ["", " ", "S3"],
                 "sample_date": ["2024-01-01", "2024-01-01", "2024-01-01"],
             }

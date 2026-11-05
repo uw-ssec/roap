@@ -16,6 +16,10 @@ canonical column names, normalises unit and pH-scale strings, flags out-of-range
 / missing / duplicate rows, and writes the `analysis_ready.csv` that Stage 1B
 will read.
 
+Only Sample rows (`row_role == SAMPLE`) are checked for duplicates (#44). CRM
+and Standard rows are kept but never get `flag_possible_duplicate` or
+`flag_duplicate_key_incomplete`.
+
 ---
 
 ## 1. Role in the pipeline

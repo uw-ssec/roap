@@ -785,11 +785,31 @@ def missing_analysis_rows(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     ).copy()
 
 
+def _role_masks(df: pd.DataFrame) -> Optional[Tuple[pd.Series, pd.Series]]:
+    """(CRM, Standard) row masks from ``row_role``, or ``None`` without roles.
+
+    Inputs written before row_role existed fall back to the deprecated
+    row_classification labels.
+    """
+    if row_roles.ROW_ROLE_COL in df.columns:
+        return row_roles.is_crm(df), row_roles.is_standard(df)
+    if "row_classification" in df.columns:
+        return (
+            df["row_classification"].isin(["CRM", "CRM_QC"]),
+            df["row_classification"].isin(["STD", "STD_QC"]),
+        )
+    return None
+
+
 def detect_duplicates(
     df: pd.DataFrame,
     keys: List[str],
 ) -> Tuple[pd.DataFrame, List[str], List[str]]:
-    """Detect duplicate rows only when all requested duplicate keys exist."""
+    """Detect duplicate Sample rows when all requested duplicate keys exist.
+
+    Only Samples are compared (#44); CRM and Standard rows are never duplicates.
+    An input with no row roles at all compares every row, as before.
+    """
     present = [key for key in keys if key in df.columns]
     missing = [key for key in keys if key not in df.columns]
     messages: List[str] = []
@@ -802,6 +822,9 @@ def detect_duplicates(
         return pd.DataFrame(), [f"No key columns found among: {keys}"], present
 
     valid = pd.Series(True, index=df.index)
+    masks = _role_masks(df)
+    if masks is not None:
+        valid &= ~(masks[0] | masks[1])
     for key in present:
         valid &= ~_series_missing(df[key])
 
@@ -1278,14 +1301,10 @@ def add_readiness_status(
     # CRM rows get CRM_QC, Standard rows get STD_QC, Samples get PASS/REVIEW/FAIL
     # Inputs written before row_role existed fall back to the deprecated
     # row_classification labels.
-    if row_roles.ROW_ROLE_COL in out.columns or "row_classification" in out.columns:
+    masks = _role_masks(out)
+    if masks is not None:
         audit_status = out["analysis_audit_status"].copy()
-        if row_roles.ROW_ROLE_COL in out.columns:
-            crm_mask = row_roles.is_crm(out)
-            std_mask = row_roles.is_standard(out)
-        else:
-            crm_mask = out["row_classification"].isin(["CRM", "CRM_QC"])
-            std_mask = out["row_classification"].isin(["STD", "STD_QC"])
+        crm_mask, std_mask = masks
         # CRM rows should have CRM_QC verdict
         audit_status[crm_mask] = "CRM_QC"
         # TRIS rows should have STD_QC verdict
@@ -1349,9 +1368,13 @@ def _run_carbonate_calc(df: pd.DataFrame, cc_cfg: Dict[str, Any]) -> Tuple[pd.Da
         # The module's own 'enabled' default must not override an explicit on.
         res = carbonate_calc.compute(df, {**cc_cfg, "enabled": True})
     except Exception as exc:
-        # Computation failures (bad or missing inputs) are recorded, not
-        # fatal, and stay distinguishable from an unusable install.
-        return df, f"carbonate_calc ERROR: {type(exc).__name__}: {exc}", {}
+        # The calculation was asked for, so a failure stops Stage 4 (#44).
+        # Continuing would write an analysis_ready.csv without the requested
+        # chemistry while the run reports success.
+        raise SystemExit(
+            f"ERROR: Stage 4 carbonate calculation failed: {type(exc).__name__}: {exc}. "
+            "Fix the inputs, or set carbonate_calc.enabled to false to skip it."
+        ) from exc
     meta = {
         "n_computed": res.n_computed,
         "n_skipped": res.n_skipped,

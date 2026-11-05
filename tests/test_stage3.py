@@ -109,6 +109,7 @@ def test_accepted_ph_scales_are_normalized_in_stage3() -> None:
     """Configured accepted pH scales should pass through normalize_ph_scale."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "ph_best": [8.05],
             "ph_co2sys": [8.04],
             "ph_scale_observed_normalized": ["total"],
@@ -155,6 +156,7 @@ def test_dic_unit_mismatch_detected_after_normalization() -> None:
     """Compatible spellings should normalize, but incompatible units should mismatch."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "dic_best_umol_kg": [2000.0],
             "co2aq_calc_umol_kg": [10.0],
             "hco3_calc_umol_kg": [1800.0],
@@ -181,6 +183,7 @@ def test_blank_dic_unit_is_missing_not_mismatch() -> None:
     """Blank species unit fields should be classified as missing unit context."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "dic_best_umol_kg": [2000.0],
             "co2aq_calc_umol_kg": [10.0],
             "hco3_calc_umol_kg": [1800.0],
@@ -229,6 +232,7 @@ def test_stage3_review_rollup_includes_provenance_issues_without_strict_chemistr
     """Unknown solver should count as review issue but not strict chemistry issue."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "has_calculated_carbonate_output": [True],
             "flag_solver_unknown": [True],
             "flag_carbon_input_pair_unknown": [True],

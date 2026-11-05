@@ -30,13 +30,13 @@ The baseline records today's output, including behaviour that is known to differ
 from the prototype and is scheduled to change. When the change lands, its PR
 regenerates the baseline and lists the differences.
 
-- **CRM/STD rows in Stage 3/4 group-key counts (#47, #44).** roap carries CRM
-  and TRIS rows through every stage (#29), and Stage 3 `build_qc_summary` counts
-  every row it receives. So sample rows report
-  `n_rows_with_incomplete_group_key = 7` (the 4 CRM and 3 TRIS rows, which have
-  no station or sample ID) where the prototype reports 0, and Stage 4
-  `missing_key_rows.csv` lists those 7 rows plus sample `S007`. #44 makes this
-  grouping count only Samples.
+- **CRM/STD rows in Stage 4 `missing_key_rows.csv` (#44).** roap carries CRM and
+  TRIS rows through every stage (#29). Since #44 only Samples count in
+  duplicate, replicate and per-group QC grouping, so Stage 3 reports
+  `n_rows_with_incomplete_group_key = 0` as the prototype does. Stage 4's
+  key-completeness report is not grouping and still checks every row, so
+  `missing_key_rows.csv` lists the 4 CRM and 3 TRIS rows (no station or sample
+  ID) plus sample `S007`.
 
 ## Changing the baseline
 

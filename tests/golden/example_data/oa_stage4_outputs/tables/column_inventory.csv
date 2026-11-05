@@ -96,7 +96,7 @@ n_ph_scale_mismatch,float64,7,25.93,1,0.0
 n_ph_strict_checkable,float64,7,25.93,1,5.0
 n_ph_values_present,float64,7,25.93,1,5.0
 n_rows,float64,7,25.93,1,5.0
-n_rows_with_incomplete_group_key,float64,7,25.93,1,7.0
+n_rows_with_incomplete_group_key,float64,7,25.93,1,0.0
 n_solver_unknown,float64,7,25.93,1,0.0
 n_stage2_replicate_conflict_carried,float64,7,25.93,1,0.0
 nitrate_nitrite_role,object,7,25.93,1,measured

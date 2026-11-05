@@ -93,12 +93,14 @@ def test_disabled_audits_are_recorded_and_flag_nothing() -> None:
     assert not result.data["data/analysis_ready.csv"]["flag_dic_species_audit_strict"].any()
 
 
-def test_carbonate_calc_errors_are_recorded(monkeypatch) -> None:
+def test_carbonate_calc_errors_fail_the_stage(monkeypatch) -> None:
+    """An enabled carbonate calculation that fails stops Stage 4 (#44)."""
     from roap import carbonate_calc
 
     def boom(df, cfg):
         raise RuntimeError("bad inputs")
 
     monkeypatch.setattr(carbonate_calc, "compute", boom)
-    result = stage4.run(_input(), load_stage_config("stage4"), carbonate_calc=True)
-    assert result.manifest["carbonate_calc"]["note"] == "carbonate_calc ERROR: RuntimeError: bad inputs"
+    with pytest.raises(SystemExit, match="carbonate calculation failed: RuntimeError: bad inputs") as info:
+        stage4.run(_input(), load_stage_config("stage4"), carbonate_calc=True)
+    assert isinstance(info.value.__cause__, RuntimeError)
