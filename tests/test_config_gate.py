@@ -36,8 +36,8 @@ def test_config_compatibility_gate_enforced():
 
         # Should fail with version error
         assert result.returncode != 0, "Pipeline should fail with stale config"
-        assert "version" in result.stderr.lower() or "compatible" in result.stderr.lower(), \
-            f"Error should mention version/compatible: {result.stderr}"
+        assert "requires pipeline version" in result.stderr.lower(), \
+            f"Error should explain the version mismatch: {result.stderr}"
 
 
 def test_config_compatibility_gate_allows_current_version():
@@ -64,5 +64,5 @@ def test_config_compatibility_gate_allows_current_version():
 
         # Should pass (or fail for other reasons, but not version)
         if result.returncode != 0:
-            assert "version" not in result.stderr.lower(), \
+            assert "requires pipeline version" not in result.stderr.lower(), \
                 f"Should not fail on version with current version: {result.stderr}"

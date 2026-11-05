@@ -5,9 +5,9 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 # Use bash for RUN so pipefail is supported.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-ARG PIXI_VERSION=v0.81.0
-ARG PIXI_SHA256_X86_64=7aa3ec39aecceff9062fa2ed4d42cbaa0bdc25ddea727d048e061cf188d434f6
-ARG PIXI_SHA256_AARCH64=9f8d2113fe9dc01788a65f5c2acec34fa56b1193461a5c3e9a775d6d2d621bcb
+ARG PIXI_VERSION=v0.84.1
+ARG PIXI_SHA256_X86_64=c81a16595e9e925fac3b12fe50cedbf415619a421ad2b72c1bba2a6ba6c2454a
+ARG PIXI_SHA256_AARCH64=0595613aedd95f84f90a55ba4b51fc1e4b86afb4eaa3e34ca3f3454d8f22c2e6
 
 # curl, git, tar, and ca-certificates are provided by the devcontainers
 # base image, so no apt install step is needed.
