@@ -1681,13 +1681,16 @@ def run(
     ``stage_config.crm_certified_values`` (loaded with
     ``StageConfig.load_crm_values``); None uses the in-code fallback table.
     ``source`` labels the workbook in the reports and the run bundle.
+    The config's ``parameters:`` block takes precedence over ``params``.
 
     Each sheet's files sit under ``sheet_<safe name>/``. Raises
     ``ValueError`` for another Stage's config or an unusable parameter.
     """
     if stage_config.stage != "qc":
         raise ValueError(f"Stage QC needs the qc config, got {stage_config.stage}.")
-    p = qc_run_parameters(params)
+    # The config file's `parameters:` block overrides ``params``, the same
+    # file-over-notebook precedence notebook 02 applies to its globals.
+    p = qc_run_parameters({**(params or {}), **(stage_config.config.get("parameters") or {})})
     workbook = Path(source) if source is not None else Path("workbook.xlsx")
     crm_values = stage_config.crm_certified_values if p["CRM_CORRECT_TA"] else None
     buffer_slug = safe_sheet_name(p["PH_BUFFER"])

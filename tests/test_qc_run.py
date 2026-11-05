@@ -116,3 +116,48 @@ def test_run_defaults_match_notebook_02_parameters_cell() -> None:
         if isinstance(node, ast.Assign) and node.targets[0].id in qc_ta_ph.QC_RUN_DEFAULTS
     }
     assert values == qc_ta_ph.QC_RUN_DEFAULTS
+
+
+def _non_default_config(tmp_path: Path, extra: str = ""):
+    path = tmp_path / "02_ta_ph_qc.yaml"
+    path.write_text(
+        "parameters:\n"
+        "  CRM_CORRECT_TA: false\n"
+        "  PHSTD_QC: false\n"
+        "  ROW_ROLE_PREFIXES:\n"
+        "    CRM: NOPE_CRM\n"
+        "    STANDARD: NOPE_STD\n" + extra,
+        encoding="utf-8",
+    )
+    return load_stage_config("qc", path)
+
+
+def _summary(result) -> dict:
+    return next(iter(result.manifest["sheet_summaries"].values()))
+
+
+def test_run_applies_the_config_files_parameters(tmp_path) -> None:
+    # A direct run(sheets, cfg) call must honour the config's parameters
+    # block, not only notebook 02 (which also copies it into its globals).
+    result = qc_ta_ph.run(_sheets(), _non_default_config(tmp_path))
+    rels = set(write_stage_result_to_memory(result))
+    assert not any("/qc/" in rel or "phstd_" in rel or "ta_crm" in rel for rel in rels)
+    info = _summary(result)
+    assert not info.get("ta_summary") and not info.get("ph_summary")
+    # Custom prefixes match nothing, so every row is a Sample (the default
+    # RM/TRIS prefixes would find CRMs and Standards).
+    counts = info["row_role_counts"]
+    assert counts["CRM"] == 0 and counts["STANDARD"] == 0 and counts["SAMPLE"] > 0
+
+
+def test_config_file_parameters_override_params(tmp_path) -> None:
+    # Same precedence as notebook 02: the file's parameters win over the
+    # caller's (notebook) values; keys the file does not set come from params.
+    result = qc_ta_ph.run(
+        _sheets(),
+        _non_default_config(tmp_path),
+        {"CRM_CORRECT_TA": True, "PHSTD_QC": True, "WRITE_PLOTS": False, "WRITE_HTML_TABLE": False},
+    )
+    assert not result.figures and not result.texts
+    info = _summary(result)
+    assert not info.get("ta_summary") and not info.get("ph_summary")
