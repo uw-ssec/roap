@@ -30,7 +30,10 @@ import pandas as pd
 from packaging.version import InvalidVersion, Version
 
 __all__ = [
+    "as_bool",
     "die",
+    "html_table",
+    "is_none_like",
     "utc_stamp",
     "canonical_colname",
     "normalize_columns",
@@ -79,6 +82,39 @@ def die(msg: str, code: int = 2) -> None:
     """Print a clear error to stderr and stop execution."""
     print(f"\nERROR: {msg}\n", file=sys.stderr)
     raise SystemExit(code)
+
+
+_TRUE_TEXT = frozenset({"true", "t", "yes", "y", "1", "on"})
+_FALSE_TEXT = frozenset({"false", "f", "no", "n", "0", "off", "", "none", "null"})
+
+
+def is_none_like(value: object) -> bool:
+    """True for None and the None-like strings Papermill or YAML pass ("", "none", "null")."""
+    return value is None or str(value).strip().lower() in {"", "none", "null"}
+
+
+def as_bool(value: object) -> bool:
+    """Read a boolean parameter from a notebook, config file or the command line.
+
+    Accepts bools, None/NaN (False) and the usual spellings (true/false,
+    yes/no, 1/0, on/off, none/null). Anything else stops with an error.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    try:
+        if pd.isna(value):
+            return False
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip().lower()
+    if text in _TRUE_TEXT:
+        return True
+    if text in _FALSE_TEXT:
+        return False
+    die(f"Cannot interpret boolean parameter value: {value!r}")
+    return False  # unreachable; die raises
 
 
 # =============================================================================
@@ -441,15 +477,12 @@ def print_quick_summary(df: pd.DataFrame, name: str, preview_rows: int = 15) -> 
     print(df.head(preview_rows).to_string(index=False))
 
 
-def write_html_table(
+def html_table(
     df: pd.DataFrame,
-    out_html: Path,
     max_rows: Optional[int] = None,
     title: Optional[str] = None,
-) -> None:
-    """Write a single page HTML table with escaped cell content."""
-    out_html.parent.mkdir(parents=True, exist_ok=True)
-
+) -> str:
+    """Return a single page HTML table with escaped cell content."""
     if max_rows is not None:
         df_show = df.head(max_rows)
         note = f"<p><b>NOTE:</b> showing first {max_rows:,} rows.</p>"
@@ -457,9 +490,9 @@ def write_html_table(
         df_show = df
         note = "<p><b>NOTE:</b> showing ALL rows.</p>"
 
-    safe_title = escape(str(title or out_html.stem))
+    safe_title = escape(str(title or "table"))
 
-    html = (
+    return (
         "<html><head><meta charset='utf-8'>"
         "<style>"
         "body{font-family:Arial, sans-serif; margin:16px}"
@@ -475,7 +508,16 @@ def write_html_table(
         + "</body></html>"
     )
 
-    out_html.write_text(html, encoding="utf-8")
+
+def write_html_table(
+    df: pd.DataFrame,
+    out_html: Path,
+    max_rows: Optional[int] = None,
+    title: Optional[str] = None,
+) -> None:
+    """Write a single page HTML table with escaped cell content."""
+    out_html.parent.mkdir(parents=True, exist_ok=True)
+    out_html.write_text(html_table(df, max_rows, title or out_html.stem), encoding="utf-8")
 
 
 # =============================================================================

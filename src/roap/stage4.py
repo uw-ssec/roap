@@ -20,8 +20,8 @@ Import as:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -30,11 +30,19 @@ from .common import (
     empty_float_series,
     empty_string_series,
     first_existing,
+    md_table_from_df,
+    normalize_columns,
     safe_str_series,
+    utc_stamp,
 )
 from .schema import DEFAULT_CONFIG, normalize_carbonate_unit, normalize_ph_scale
+from .stage_result import StageResult, json_text, package_versions
+
+if TYPE_CHECKING:
+    from .stage_config import StageConfig
 
 __all__ = [
+    "NOTEBOOK",
     "STAGE4_DEFAULTS",
     "DicSpeciesAudit",
     "coerce_and_standardize",
@@ -46,7 +54,10 @@ __all__ = [
     "dic_species_audit",
     "add_readiness_status",
     "reason_count_table",
+    "run",
 ]
+
+NOTEBOOK = "08_stage4"
 
 
 # =============================================================================
@@ -1312,3 +1323,284 @@ def reason_count_table(
         return pd.DataFrame(columns=["reason_code", "count"])
 
     return values.value_counts().rename_axis("reason_code").reset_index(name="count")
+
+
+# =============================================================================
+# Stage run (#42)
+# =============================================================================
+
+_DIC_FLAG_COLUMNS = (
+    "flag_dic_species_audit_strict",
+    "flag_dic_species_unit_mismatch_audit",
+    "flag_dic_species_unit_missing_audit",
+    "flag_dic_species_audit_not_run",
+    "flag_dic_species_values_missing_audit",
+)
+
+
+def _run_carbonate_calc(df: pd.DataFrame, cc_cfg: Dict[str, Any]) -> Tuple[pd.DataFrame, str, Dict[str, Any]]:
+    # The import is deliberately OUTSIDE the try/except below. If carbonate
+    # chemistry was asked for and the engine cannot be imported, that is a
+    # broken install and must fail loudly: a silently skipped calculation
+    # yields an analysis_ready.csv with no chemistry while the run succeeds.
+    from . import carbonate_calc
+
+    try:
+        # The module's own 'enabled' default must not override an explicit on.
+        res = carbonate_calc.compute(df, {**cc_cfg, "enabled": True})
+    except Exception as exc:
+        # Computation failures (bad or missing inputs) are recorded, not
+        # fatal, and stay distinguishable from an unusable install.
+        return df, f"carbonate_calc ERROR: {type(exc).__name__}: {exc}", {}
+    meta = {
+        "n_computed": res.n_computed,
+        "n_skipped": res.n_skipped,
+        "settings": res.settings,
+        "batch_quality": res.batch_quality,
+        "notes": list(res.notes),
+    }
+    note = f"Computed carbonate system for {res.n_computed} rows ({res.n_skipped} skipped) with PyCO2SYS."
+    return res.df, note, meta
+
+
+def run(
+    df: pd.DataFrame,
+    stage_config: "StageConfig",
+    *,
+    source: Optional[str] = None,
+    range_checks: bool = True,
+    dic_species_check: bool = True,
+    carbonate_calc: bool = False,
+) -> StageResult:
+    """Run Stage 4 on Stage 3's enhanced frame; no disk IO.
+
+    ``range_checks`` and ``dic_species_check`` switch those audits off.
+    The internal PyCO2SYS calculation runs when ``carbonate_calc`` is True
+    or the config sets ``carbonate_calc.enabled``. ``source`` labels the
+    input in the frame's ``source_file_stage4`` column, the report and the
+    run bundle. Raises ``ValueError`` for another Stage's config; a missing
+    required key column stops with ``SystemExit`` as before.
+    """
+    # Stage 4 shares Stage 2's alias, presence and inventory steps.
+    from .stage2 import (
+        ensure_required_columns,
+        make_column_inventory,
+        make_presence_table,
+        materialize_canonical_aliases,
+    )
+
+    if stage_config.stage != "stage4":
+        raise ValueError(f"Stage 4 needs the stage4 config, got {stage_config.stage}.")
+    config = stage_config.config
+    required_key_cols = list(config.get("required_stage4_key_columns", config.get("required_stage3_columns", [])))
+    required_analysis_cols = list(config.get("required_stage4_analysis_columns", []))
+    expected_cols = list(config.get("expected_stage4_columns", config.get("expected_stage3_columns", [])))
+    required_cols = list(dict.fromkeys(required_key_cols + required_analysis_cols))
+    notes: List[str] = []
+
+    df = normalize_columns(df.copy())
+    df["source_file_stage4"] = str(source) if source is not None else ""
+    df["stage4_processed_utc"] = utc_stamp()
+    df, alias_resolution = materialize_canonical_aliases(df, config["canonical_aliases"], notes)
+    # Required key columns are the hard Stage 4 contract. Required analysis
+    # columns are handled separately so they can become explicit FAIL reasons.
+    ensure_required_columns(df, required_key_cols)
+    df = coerce_and_standardize(df, notes)
+
+    presence_df = make_presence_table(df, required=required_cols, expected=expected_cols)
+    missing_opt = presence_df.loc[(~presence_df["required"]) & (~presence_df["present"]), "column"].tolist()
+    if missing_opt:
+        notes.append("Optional expected columns not found: " + ", ".join(missing_opt))
+    inventory_df = make_column_inventory(df)
+
+    # The internal carbonate calculation runs before the range checks and
+    # DIC audit, so those audit the pipeline's own chemistry.
+    cc_cfg = config.get("carbonate_calc", {}) or {}
+    carbonate_note, carbonate_meta = "Skipped (not enabled).", {}
+    if carbonate_calc or bool(cc_cfg.get("enabled", False)):
+        df, carbonate_note, carbonate_meta = _run_carbonate_calc(df, cc_cfg)
+
+    dup_keys = [str(k).strip() for k in config.get("duplicate_keys", []) if str(k).strip()]
+    key_missing = missing_key_rows(df, required_key_cols)
+    analysis_missing = missing_analysis_rows(df, required_analysis_cols)
+    dup_table, dup_msgs, keys_used = detect_duplicates(df, dup_keys)
+
+    range_summary, range_flags_df = pd.DataFrame(), pd.DataFrame()
+    # Stage 4's own Range policy (#41).
+    policy = stage_config.range_policy
+    if range_checks:
+        range_summary, range_flags_df = run_range_checks(df, policy)
+    else:
+        notes.append("Range checks were disabled.")
+    df = add_range_flag_count(df, range_flags_df)
+
+    dic_note, dic_meta = "Skipped (disabled by user or config).", {}
+    dic_check = DicSpeciesAudit.from_config(config)
+    if dic_species_check and dic_check.enabled:
+        dic_result, dic_note, dic_meta = dic_species_audit(
+            df,
+            dic_check,
+            candidates=config.get("strict_dic_candidates", {}),
+            unit_equivalents=set(config.get("unit_equivalents", [])),
+        )
+        for col in _DIC_FLAG_COLUMNS:
+            df[col] = (
+                dic_result[col] if col in dic_result.columns else pd.Series(False, index=df.index, dtype="boolean")
+            )
+    else:
+        notes.append("Strict DIC vs species audit disabled.")
+        dic_result = pd.DataFrame(index=df.index)
+        for col in _DIC_FLAG_COLUMNS:
+            df[col] = pd.Series(False, index=df.index, dtype="boolean")
+            dic_result[col] = df[col]
+
+    df = add_readiness_status(
+        df,
+        dup_table=dup_table,
+        missing_key_idx=key_missing.index,
+        required_analysis_missing_idx=analysis_missing.index,
+    )
+
+    status_counts = (
+        df["analysis_audit_status"].value_counts(dropna=False).rename_axis("status").reset_index(name="count")
+    )
+    reason_counts_df = reason_count_table(df)
+    notes_md = "\n".join(f"- {n}" for n in notes) if notes else "- (none)"
+
+    def _flag_count(col: str) -> int:
+        if col in df.columns:
+            return int(df[col].fillna(False).sum())
+        return 0
+
+    report = f"""# Stage 4 Analysis Audit Report
+
+**Generated:** {utc_stamp()}
+**Input:** `{source}`
+**Rows:** {len(df):,}  **Columns:** {df.shape[1]:,}
+
+## What this stage does
+Audits the Stage 3 table for contract compliance, key integrity, range
+violations, and optional strict DIC species closure. Assigns
+`analysis_audit_status` (PASS / REVIEW / FAIL) with explicit reason
+codes. Does NOT rebuild chemistry or overwrite Stage 3 QC flags.
+
+## Final readiness classification
+{md_table_from_df(status_counts, max_rows=20)}
+
+### Reason code counts
+{md_table_from_df(reason_counts_df, max_rows=200) if not reason_counts_df.empty else "_(none)_"}
+
+## Canonical field presence
+{md_table_from_df(presence_df, max_rows=200)}
+
+## Key and duplicate integrity
+- Required key columns: `{list(required_key_cols)}`
+- Required analysis columns: `{list(required_analysis_cols)}`
+- Duplicate keys requested: `{dup_keys}`
+- Duplicate keys actually used: `{keys_used}`
+- Rows with missing key fields: **{len(key_missing):,}**
+- Rows with missing required analysis fields: **{len(analysis_missing):,}**
+- Duplicate rows found: **{len(dup_table):,}**
+
+## Range checks
+- Variables checked: **{len(range_summary):,}**
+- Flagged cells: **{len(range_flags_df):,}**
+
+{md_table_from_df(range_summary, max_rows=200) if not range_summary.empty else "_(no range rows written)_"}
+
+## Strict DIC vs species audit
+{dic_note}
+
+- Rows with strict DIC fail: **{_flag_count("flag_audit_strict_dic_fail"):,}**
+- Rows with DIC unit mismatch: **{_flag_count("flag_audit_dic_unit_mismatch"):,}**
+- Rows with DIC unit missing: **{_flag_count("flag_audit_dic_unit_missing"):,}**
+- Rows where DIC audit did not run: **{_flag_count("flag_audit_dic_audit_not_run"):,}**
+- Rows with missing DIC species values: **{_flag_count("flag_audit_dic_values_missing"):,}**
+
+## Inherited Stage 3 context flags
+| Flag | Rows |
+|------|-----:|
+| flag_any_carbonate_issue | {_flag_count("flag_any_carbonate_issue"):,} |
+| flag_any_carbonate_issue_strict | {_flag_count("flag_any_carbonate_issue_strict"):,} |
+| flag_stage2_replicate_conflict_carried | {_flag_count("flag_stage2_replicate_conflict_carried"):,} |
+| flag_solver_unknown | {_flag_count("flag_solver_unknown"):,} |
+| flag_carbon_input_pair_unknown | {_flag_count("flag_carbon_input_pair_unknown"):,} |
+
+## Column inventory (top 30 by missingness)
+{md_table_from_df(inventory_df.head(30), max_rows=200)}
+
+## Notes
+{notes_md}
+
+## Main outputs
+- analysis-ready CSV: `data/analysis_ready.csv`
+- range_flags_long: `tables/range_flags_long.csv`
+- dic_species_audit: `tables/dic_species_audit.csv`
+"""
+
+    def status(name: str) -> int:
+        return int((df["analysis_audit_status"] == name).sum())
+
+    manifest = {
+        "notebook": NOTEBOOK,
+        "generated_utc": utc_stamp(),
+        "input_csv": source,
+        "config_source": stage_config.source,
+        "config_warnings": list(stage_config.warnings),
+        "parameters": {},
+        "policies": {
+            "range_policy": asdict(policy),
+            "dic_species_audit": asdict(dic_check),
+            "required_stage4_key_columns": required_key_cols,
+            "required_stage4_analysis_columns": required_analysis_cols,
+            "expected_stage4_columns": expected_cols,
+            "duplicate_keys": dup_keys,
+            "duplicate_keys_used": keys_used,
+        },
+        "alias_resolution": alias_resolution,
+        "dic_column_sources": dic_meta,
+        "carbonate_calc": {"note": carbonate_note, **carbonate_meta},
+        "duplicate_messages": list(dup_msgs),
+        "row_counts": {
+            "n_rows": int(len(df)),
+            "missing_key_rows": int(len(key_missing)),
+            "missing_required_analysis_rows": int(len(analysis_missing)),
+            "duplicate_rows": int(len(dup_table)),
+            "range_flagged_cells": int(len(range_flags_df)),
+            "dic_strict_fails": _flag_count("flag_dic_species_audit_strict"),
+            "status_PASS": status("PASS"),
+            "status_REVIEW": status("REVIEW"),
+            "status_FAIL": status("FAIL"),
+            "status_CRM_QC": status("CRM_QC"),
+            "status_STD_QC": status("STD_QC"),
+        },
+        "reason_code_counts": (
+            reason_counts_df.set_index("reason_code")["count"].to_dict() if not reason_counts_df.empty else {}
+        ),
+        "notes": notes,
+        "package_versions": package_versions(),
+    }
+    alias_df = pd.DataFrame(
+        {"canonical_column": list(alias_resolution.keys()), "resolved_from": list(alias_resolution.values())}
+    )
+    return StageResult(
+        stage="stage4",
+        data={"data/analysis_ready.csv": df},
+        tables={
+            "tables/column_inventory.csv": inventory_df,
+            "tables/missingness_top40.csv": inventory_df.head(40),
+            "tables/canonical_presence.csv": presence_df,
+            "tables/alias_resolution.csv": alias_df,
+            "tables/missing_key_rows.csv": key_missing,
+            "tables/duplicates_by_keys.csv": dup_table,
+            "tables/range_check_summary.csv": range_summary,
+            "tables/range_flags_long.csv": range_flags_df,
+            "tables/dic_species_audit.csv": dic_result,
+        },
+        reports={"reports/report.md": report},
+        texts={"logs/effective_config.json": json_text(config)},
+        manifest=manifest,
+        input_file=source,
+        config_files=[stage_config.source],
+        bundle_name=NOTEBOOK,
+    )
