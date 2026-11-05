@@ -15,13 +15,9 @@
 #
 # Why each override:
 #   PH_COL            - real measured pH column in this workbook.
-#   CRM_OR_SAMPLE_COL - remap to `sample_type`. For pH QC this makes the CRM
-#                       rows be excluded from the "sample" set instead of
-#                       miscounted as pH samples (samples are now flag=="sample"
-#                       rather than "anything that isn't a tris standard").
-#   ALLOW_CRM_FLAG_COL- let TA CRM detection also honor sample_type=="crm" in
-#                       addition to the RM tag prefix (OR logic; purely
-#                       additive, cannot drop the 7 already detected by tag).
+#   Row roles come from the Tag prefix only (ADR-0006): RM213_* rows are
+#   CRMs, tris_* rows are Standards, everything else is a Sample. The
+#   `sample_type` column is not read for this.
 #   PHSTD_QC          - ON. tris standards are present and should be QC'd.
 # ---------------------------------------------------------------------------
 parameters:
@@ -29,16 +25,13 @@ parameters:
   PH_COL: ph_observed
   PH_TEMP_COL: temp_lab
 
-  # --- Type indicator column (values: sample / std / crm) ---
-  CRM_OR_SAMPLE_COL: sample_type
-  ALLOW_CRM_FLAG_COL: true
-
   # --- pH-standard (tris buffer) QC: ON ---
-  # Defaults already match (PH_BUFFER=tris, PHSTD_TAG_PREFIX=tris, MIN_PHSTD_N=2);
-  # restated for self-documentation. 8 tris rows >> MIN_PHSTD_N.
+  # Defaults already match (PH_BUFFER=tris, Standard tag prefix TRIS,
+  # MIN_PHSTD_N=2); restated for self-documentation. 8 tris rows >> MIN_PHSTD_N.
   PHSTD_QC: true
   PH_BUFFER: tris
-  PHSTD_TAG_PREFIX: tris
+  ROW_ROLE_PREFIXES:
+    STANDARD: tris
 
   # Flag/QC the tris standards but do NOT rewrite sample ph_observed by the
   # standard offset. Set true only if you want measured sample pH corrected.

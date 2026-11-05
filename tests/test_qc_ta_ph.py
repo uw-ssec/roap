@@ -12,6 +12,9 @@ These tests protect the scientific behaviour of roap.qc_ta_ph:
 5. Enforcement of require_ta_value_for_crm.
 6. Protection against correcting CRM rows themselves.
 7. Preservation of original pH when pH correction is disabled or withheld.
+
+Row roles come from the ``row_role`` column (``roap.row_roles``), so the
+frames below set it directly.
 """
 
 from __future__ import annotations
@@ -86,7 +89,7 @@ def _ta_crm_outlier_frame() -> pd.DataFrame:
     crm_rows = pd.DataFrame(
         {
             "sample_tag": [f"RM213_{i + 1}" for i in range(6)],
-            "crm_or_sample": ["crm"] * 6,
+            "row_role": ["CRM"] * 6,
             "ta": crm_ta,
             "batch": ["A"] * 6,
         }
@@ -95,7 +98,7 @@ def _ta_crm_outlier_frame() -> pd.DataFrame:
     sample_row = pd.DataFrame(
         {
             "sample_tag": ["S001"],
-            "crm_or_sample": ["sample"],
+            "row_role": ["SAMPLE"],
             "ta": [2300.0],
             "batch": ["A"],
         }
@@ -112,12 +115,9 @@ def test_ta_crm_outlier_is_excluded_from_correction() -> None:
         df,
         ta_col="ta",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         crm_batch="213",
         crm_ta_override=None,
         group_by=None,
-        crm_tag_prefix="RM",
-        allow_crm_flag_col=True,
         require_ta_value_for_crm=True,
         min_crm_n=5,
         mad_k=3.5,
@@ -150,7 +150,7 @@ def test_require_ta_value_for_crm_rejects_detected_crm_with_missing_ta() -> None
     df = pd.DataFrame(
         {
             "sample_tag": ["RM213_1", "RM213_2", "S001"],
-            "crm_or_sample": ["crm", "crm", "sample"],
+            "row_role": ["CRM", "CRM", "SAMPLE"],
             "ta": [CRM_CERTIFIED_TA["213"], pd.NA, 2300.0],
         }
     )
@@ -160,12 +160,9 @@ def test_require_ta_value_for_crm_rejects_detected_crm_with_missing_ta() -> None
             df,
             ta_col="ta",
             sample_tag_col="sample_tag",
-            crm_or_sample_col="crm_or_sample",
             crm_batch="213",
             crm_ta_override=None,
             group_by=None,
-            crm_tag_prefix="RM",
-            allow_crm_flag_col=True,
             require_ta_value_for_crm=True,
             min_crm_n=1,
             mad_k=3.5,
@@ -183,12 +180,9 @@ def test_ta_correction_does_not_apply_to_crm_when_correct_only_samples_false() -
         df,
         ta_col="ta",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         crm_batch="213",
         crm_ta_override=None,
         group_by=None,
-        crm_tag_prefix="RM",
-        allow_crm_flag_col=True,
         require_ta_value_for_crm=True,
         min_crm_n=5,
         mad_k=3.5,
@@ -209,12 +203,9 @@ def test_ta_correction_level_is_reported() -> None:
         df,
         ta_col="ta",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         crm_batch="213",
         crm_ta_override=None,
         group_by=None,
-        crm_tag_prefix="RM",
-        allow_crm_flag_col=True,
         require_ta_value_for_crm=True,
         min_crm_n=5,
         mad_k=3.5,
@@ -244,7 +235,7 @@ def _phstd_outlier_frame() -> pd.DataFrame:
     std_rows = pd.DataFrame(
         {
             "sample_tag": [f"TRIS_{i + 1}" for i in range(6)],
-            "crm_or_sample": ["std"] * 6,
+            "row_role": ["STANDARD"] * 6,
             "pH_lab": measured,
             "temp_lab": [25.0] * 6,
             "batch": ["A"] * 6,
@@ -254,7 +245,7 @@ def _phstd_outlier_frame() -> pd.DataFrame:
     sample_row = pd.DataFrame(
         {
             "sample_tag": ["S001"],
-            "crm_or_sample": ["sample"],
+            "row_role": ["SAMPLE"],
             "pH_lab": [8.050],
             "temp_lab": [25.0],
             "batch": ["A"],
@@ -271,18 +262,15 @@ def test_phstd_outlier_is_excluded_from_correction() -> None:
     out, phstd_qc, corr_table, summary = apply_ph_standard_qc_and_correction(
         df,
         buffer="tris",
-        tag_prefix="TRIS",
         ph_col="pH_lab",
         temp_col="temp_lab",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         group_by=None,
         mad_k=3.5,
         max_abs_diff=0.05,
         min_std_n=5,
         correct_samples=True,
         status_thr=PhStdStatusThresholds(ok=0.02, warn=0.05),
-        sample_flag_value="sample",
         apply_warn_correction=True,
         allow_temp_clamp=False,
     )
@@ -314,18 +302,15 @@ def test_ph_correction_level_is_reported() -> None:
     out, _, _, _ = apply_ph_standard_qc_and_correction(
         df,
         buffer="tris",
-        tag_prefix="TRIS",
         ph_col="pH_lab",
         temp_col="temp_lab",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         group_by=None,
         mad_k=3.5,
         max_abs_diff=0.05,
         min_std_n=5,
         correct_samples=True,
         status_thr=PhStdStatusThresholds(ok=0.02, warn=0.05),
-        sample_flag_value="sample",
         apply_warn_correction=True,
         allow_temp_clamp=False,
     )
@@ -340,7 +325,7 @@ def test_ph_corrected_column_preserves_original_when_correction_withheld() -> No
     df = pd.DataFrame(
         {
             "sample_tag": ["TRIS_1", "TRIS_2", "S001"],
-            "crm_or_sample": ["std", "std", "sample"],
+            "row_role": ["STANDARD", "STANDARD", "SAMPLE"],
             "pH_lab": [7.500, 7.510, 8.050],
             "temp_lab": [25.0, 25.0, 25.0],
         }
@@ -349,18 +334,15 @@ def test_ph_corrected_column_preserves_original_when_correction_withheld() -> No
     out, _, _, summary = apply_ph_standard_qc_and_correction(
         df,
         buffer="tris",
-        tag_prefix="TRIS",
         ph_col="pH_lab",
         temp_col="temp_lab",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         group_by=None,
         mad_k=3.5,
         max_abs_diff=None,
         min_std_n=2,
         correct_samples=True,
         status_thr=PhStdStatusThresholds(ok=0.02, warn=0.05),
-        sample_flag_value="sample",
         apply_warn_correction=True,
         allow_temp_clamp=False,
     )
@@ -380,18 +362,15 @@ def test_ph_corrected_column_preserves_original_when_correction_disabled() -> No
     out, _, _, _ = apply_ph_standard_qc_and_correction(
         df,
         buffer="tris",
-        tag_prefix="TRIS",
         ph_col="pH_lab",
         temp_col="temp_lab",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         group_by=None,
         mad_k=3.5,
         max_abs_diff=0.05,
         min_std_n=5,
         correct_samples=False,
         status_thr=PhStdStatusThresholds(ok=0.02, warn=0.05),
-        sample_flag_value="sample",
         apply_warn_correction=True,
         allow_temp_clamp=False,
     )
@@ -433,12 +412,9 @@ def test_no_unexpected_nan_in_outlier_summaries() -> None:
         df,
         ta_col="ta",
         sample_tag_col="sample_tag",
-        crm_or_sample_col="crm_or_sample",
         crm_batch="213",
         crm_ta_override=None,
         group_by=None,
-        crm_tag_prefix="RM",
-        allow_crm_flag_col=True,
         require_ta_value_for_crm=True,
         min_crm_n=5,
         mad_k=3.5,
