@@ -37,13 +37,18 @@ def test_build_corrections_table_always_returns_dataframe():
 
 
 def test_invariant_test_runs_without_config():
-    """Simulate invariant test running Stage 2 without --config-dir."""
-    # This is more of an integration test - verify pipeline stage runs
-    # without config don't crash on CRM correction
-    import subprocess
+    """Stage 2 runs without a config file and does not crash on CRM correction.
+
+    Guards the old ``AttributeError: 'NoneType' object has no attribute
+    'columns'`` from a missing corrections table.
+    """
     from pathlib import Path
 
-    # Run Stage 2 notebook via papermill without config dir
-    # Should not crash with AttributeError: 'NoneType' object has no attribute 'columns'
-    # (This test may be slow - mark as @pytest.mark.slow)
-    pass
+    from roap import stage2
+    from roap.stage_config import load_stage_config
+
+    golden = Path(__file__).resolve().parent / "golden" / "example_data"
+    df = pd.read_csv(golden / "oa_stage1b_outputs" / "data" / "analysis_ready_samples.csv")
+    result = stage2.run(df, load_stage_config("stage2", None))
+    assert "data/enhanced.csv" in result.data
+    assert len(result.data["data/enhanced.csv"]) == len(df)

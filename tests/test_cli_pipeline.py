@@ -1,4 +1,4 @@
-"""Migration gate: run_pipeline.sh drives the full pipeline end to end.
+"""Migration gate: the pipeline runs end to end and run_pipeline.sh is usable.
 
 The plan asserted ``outputs/test/analysis_ready.csv`` with a ``verdict``
 column holding 4 FAIL rows. None of those three facts hold:
@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+
+from roap.pipeline import run_pipeline
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "run_pipeline.sh"
@@ -43,7 +45,7 @@ def test_run_pipeline_sh_executable() -> None:
 
 
 def test_run_pipeline_dry_run_succeeds(tmp_path: Path, bash_exe: str) -> None:
-    """--dry-run resolves notebooks and prints the chain without executing."""
+    """--dry-run parses the arguments and prints the roap run command without executing."""
     result = subprocess.run(
         [bash_exe, RUNNER.as_posix(), EXAMPLE_XLSX.as_posix(), (tmp_path / "out").as_posix(), "--dry-run"],
         capture_output=True,
@@ -56,18 +58,13 @@ def test_run_pipeline_dry_run_succeeds(tmp_path: Path, bash_exe: str) -> None:
 
 
 @pytest.mark.slow
-def test_pipeline_runs_end_to_end(tmp_path: Path, bash_exe: str) -> None:
-    """Full Papermill run produces the final deliverable with injected issues."""
+def test_pipeline_runs_end_to_end(tmp_path: Path) -> None:
+    """A full in-process run produces the final deliverable with injected issues.
+
+    run_pipeline.sh's own end to end smoke test is test_run_pipeline_sh.py.
+    """
     out_root = tmp_path / "out"
-    result = subprocess.run(
-        [bash_exe, RUNNER.as_posix(), EXAMPLE_XLSX.as_posix(), out_root.as_posix()],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=1800,
-        env={**os.environ, "PYTHON_BIN": sys.executable},
-    )
-    assert result.returncode == 0, f"Pipeline failed:\n{result.stdout[-4000:]}\n{result.stderr[-4000:]}"
+    run_pipeline(EXAMPLE_XLSX, out_root, runs_dir=out_root / "runs" / "test", log=lambda _: None)
 
     final = out_root / FINAL_REL
     assert final.exists(), f"Missing final deliverable: {final}"
