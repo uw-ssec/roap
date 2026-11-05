@@ -2,8 +2,8 @@
 # ---------------------------------------------------------------------------
 # Per-stage overrides for Notebook 02 (TA + pH QC), applied by run_pipeline.sh
 # via --config-dir and consumed in the notebook's config cell under the
-# `parameters:` key. Only keys that already exist as notebook globals are
-# applied; unknown keys are ignored with a warning.
+# `parameters:` key. roap.stage_config checks it: keys must be notebook
+# parameter names, and an unknown or removed key stops the run.
 #
 # Workbook: oa_data_apr.xlsx
 #   * pH measured column is `ph_observed` (not the old `pH_lab`).
