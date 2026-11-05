@@ -11,6 +11,9 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
 - Stage 1B stores `is_sample_row` as a boolean again, so CRM and standard rows
   are no longer treated as samples and no longer get
   `flag_core_chemistry_missing` (#47)
+- Stage 1B `classify_rows_sample` no longer raises `NameError` on rows with a
+  blank or unrecognised `sample_type`, or `IndexError` on frames without a
+  `RangeIndex`; such rows fall back to the CRM/pH-standard QC flags (#38)
 
 ## [2026.11.0] - 2026-11-04
 

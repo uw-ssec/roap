@@ -574,14 +574,10 @@ def classify_rows_sample(df: pd.DataFrame) -> pd.Series:
 
     # Fallback: rows not explicitly tagged use QC flags
     fallback_mask = ~explicit_sample & ~explicit_crm & ~explicit_std
-    if fallback_mask.any():
-        fallback_qc = pd.Series(
-            ["CRM" if is_crm.iloc[i] else ("STD" if is_std.iloc[i] else "SAMPLE")
-             for i in df.index if fallback_mask.iloc[i]],
-            index=df.index[fallback_mask],
-            dtype=object,
-        )
-        out = out.mask(fallback_mask, fallback_qc)
+    # (label-aligned masks: the frame need not have a RangeIndex, #38)
+    is_std = _bool_series(df, "is_phstd_row", default=False)
+    out[fallback_mask & is_std] = "STD"
+    out[fallback_mask & is_crm] = "CRM"
 
     return out
 
