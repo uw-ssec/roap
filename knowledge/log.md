@@ -1,3 +1,9 @@
+## 2026-11-05
+
+- **Creation**: Documented `domain/blank-row-role-question.md`, the unanswered
+  domain question in #45, evidence needed from Maurice / Prof. Mahu, and
+  follow-up paths. No Blank role or scientific treatment is approved.
+
 ## 2026-10-27
 
 - **Creation**: Documented concept `decisions/gui-cancel-stops-process-tree.md`

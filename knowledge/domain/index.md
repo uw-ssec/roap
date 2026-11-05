@@ -1,5 +1,8 @@
 # Domain
 
+- [Do laboratory blanks need a Row role?](blank-row-role-question.md) - Open
+  domain question for issue 45: confirm whether laboratory blanks occur, their
+  Tag prefix, and their treatment in correction and statistics.
 - [Data Standards: Frontiers 2021](data-standards.md) - Clarified column names,
   unified 0-9 QC flags, -999 missing sentinel, provenance metadata, schema
   versioning
