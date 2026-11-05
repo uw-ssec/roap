@@ -37,20 +37,24 @@ oa_prelim_data.xlsx
 
 For each sheet:
 
-1. **TA CRM QC.** Rows whose sample tag begins with `CRM_TAG_PREFIX` (default
-   `"RM"`) are treated as CRM measurements. The notebook compares
+0. **Row roles.** Each row gets a `row_role` of `SAMPLE`, `CRM` or `STANDARD`,
+   decided once from its Tag prefix only (ADR-0006, `roap.row_roles`). Later
+   stages read `row_role` instead of re-deriving it.
+1. **TA CRM QC.** Rows with the CRM role (tag prefix `ROW_ROLE_PREFIXES["CRM"]`,
+   default `"RM"`) are treated as CRM measurements. The notebook compares
    `certified − measured` Total Alkalinity against the SOP thresholds and
    chooses one of four statuses: `NO_ADJUST` (within noise floor), `ADJUST`
    (apply the mean offset), `FAIL` (offset exceeds reject threshold),
    `INSUFFICIENT_DATA` (too few non-outlier CRMs). Outliers within the CRM batch
    are flagged using the robust median-absolute-deviation rule from Iglewicz &
    Hoaglin (1993).
-2. **pH-standard QC.** Rows whose tag begins with `PHSTD_TAG_PREFIX` (default
-   `"tris"`) are treated as pH-buffer measurements. Their expected pH is
-   linearly interpolated from the buffer's table (TRIS / AMP / BIS from the
-   Dickson SOP — _Guide to Best Practices for Ocean CO2 Measurements_, PICES
-   Spec. Pub. 3, 2007) at the measured temperature, and the residual
-   `expected − measured` is classified as `OK` / `WARN` / `FAIL`.
+2. **pH-standard QC.** Rows with the Standard role (tag prefix
+   `ROW_ROLE_PREFIXES["STANDARD"]`, default `"TRIS"`) are treated as pH-buffer
+   measurements. Their expected pH is linearly interpolated from the buffer's
+   table (TRIS / AMP / BIS from the Dickson SOP — _Guide to Best Practices for
+   Ocean CO2 Measurements_, PICES Spec. Pub. 3, 2007) at the measured
+   temperature, and the residual `expected − measured` is classified as `OK` /
+   `WARN` / `FAIL`.
 3. **Derived CSV.** The QC-corrected sheet, with new columns
    `ta_corrected_umolkg`, `ph_corrected_from_phstd`, `ta_qc_status`,
    `phstd_status`, etc. **This is what Stage 1A reads.**
@@ -59,9 +63,9 @@ For each sheet:
 
 ## 2. Inputs
 
-| Item        | Type    | Notes                                                                                                                                                  |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `XLSX_PATH` | `.xlsx` | Source workbook. Each sheet must contain the columns named by `TA_COL`, `PH_COL`, `PH_TEMP_COL`, `SAMPLE_TAG_COL`, and optionally `CRM_OR_SAMPLE_COL`. |
+| Item        | Type    | Notes                                                                                                              |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `XLSX_PATH` | `.xlsx` | Source workbook. Each sheet must contain the columns named by `TA_COL`, `PH_COL`, `PH_TEMP_COL`, `SAMPLE_TAG_COL`. |
 
 The notebook does **not** assume the workbook came from notebook 01. The two
 notebooks operate on the same `.xlsx` but write to different output roots
@@ -128,7 +132,7 @@ papermill 02_ta_ph_qc.ipynb runs/02_ta_ph_qc.run.ipynb \
     -p XLSX_PATH "C:/path/to/your.xlsx" \
     -p SHEET "all" \
     -p PH_BUFFER "amp" \
-    -p PHSTD_TAG_PREFIX "amp"
+    -y "ROW_ROLE_PREFIXES: {STANDARD: amp}"
 ```
 
 The first code cell is tagged `parameters` so Papermill injects overrides
@@ -152,13 +156,22 @@ immediately after it ([Papermill docs](https://github.com/nteract/papermill)).
 
 ### Column names expected in each sheet
 
-| Name                | Default           |
-| ------------------- | ----------------- |
-| `TA_COL`            | `"ta"`            |
-| `PH_COL`            | `"pH_lab"`        |
-| `PH_TEMP_COL`       | `"temp_lab"`      |
-| `SAMPLE_TAG_COL`    | `"sample_tag"`    |
-| `CRM_OR_SAMPLE_COL` | `"crm_or_sample"` |
+| Name             | Default        |
+| ---------------- | -------------- |
+| `TA_COL`         | `"ta"`         |
+| `PH_COL`         | `"pH_lab"`     |
+| `PH_TEMP_COL`    | `"temp_lab"`   |
+| `SAMPLE_TAG_COL` | `"sample_tag"` |
+
+### Row roles
+
+| Name                | Default                             | Meaning                                                                                                                                                   |
+| ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ROW_ROLE_PREFIXES` | `{"CRM": "RM", "STANDARD": "TRIS"}` | Case-insensitive Tag prefixes for the CRM and Standard roles; every other row, including a blank tag, is a Sample. Set one key to keep the other default. |
+
+`CRM_TAG_PREFIX`, `PHSTD_TAG_PREFIX`, `ALLOW_CRM_FLAG_COL` and
+`CRM_OR_SAMPLE_COL` were removed (#40); the notebook stops with a message if a
+config or Papermill run still sets them.
 
 ### TA CRM QC
 
@@ -168,7 +181,6 @@ immediately after it ([Papermill docs](https://github.com/nteract/papermill)).
 | `CRM_BATCH`         | `"213"`                               | Must exist in `configs/crm_certified_values.yaml` (or the corrected in-code fallback in `roap/qc_ta_ph.py`).                                                         |
 | `CRM_VALUES_CONFIG` | `"configs/crm_certified_values.yaml"` | **Audit fix N-1.** Path to the authoritative certified CRM values, transcribed from the NOAA OCADS Dickson batch table. `None` → use the corrected in-code fallback. |
 | `CRM_TA_OVERRIDE`   | None                                  | Numeric value to override the certified TA                                                                                                                           |
-| `CRM_TAG_PREFIX`    | `"RM"`                                | CRM tag prefix                                                                                                                                                       |
 | `MIN_CRM_N`         | 2                                     | Minimum non-outlier CRMs needed to compute a correction                                                                                                              |
 | `TA_MAD_K`          | 3.5                                   | Outlier rule: distance > k·1.4826·MAD                                                                                                                                |
 | `TA_MAX_ABS_DIFF`   | 20.0                                  | Also flag if `                                                                                                                                                       | diff | > this`; 0 disables |
@@ -183,7 +195,6 @@ immediately after it ([Papermill docs](https://github.com/nteract/papermill)).
 | ----------------------- | -------- | ---------------------------------------- | --------- | ------------------- |
 | `PHSTD_QC`              | True     | Master switch                            |
 | `PH_BUFFER`             | `"tris"` | `"tris"` / `"amp"` / `"bis"`             |
-| `PHSTD_TAG_PREFIX`      | `"tris"` | Tag prefix that identifies standard rows |
 | `PHSTD_CORRECT_SAMPLES` | False    | Whether to write corrected pH to samples |
 | `MIN_PHSTD_N`           | 2        | Minimum non-outlier standards            |
 | `PH_OK`                 | 0.02     | Status OK if `                           | mean diff | ` ≤ this            |

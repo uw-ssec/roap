@@ -13,6 +13,29 @@ Releases use [CalVer](https://calver.org/) `YYYY.0M.MICRO` (as
   fails when that output changes. Regenerate with
   `pixi run python tools/golden_baseline.py` and list each intended difference
   in the PR description (#37)
+- `roap.row_roles` decides each row's Row role (`SAMPLE`, `CRM` or `STANDARD`)
+  once, at Stage QC, from the Tag prefix only (ADR-0006). Stage QC writes it as
+  a new `row_role` column, which every later Stage reads and the final output
+  carries. Prefixes are set with `ROW_ROLE_PREFIXES` (defaults `CRM: RM`,
+  `STANDARD: TRIS`, case-insensitive); rows with a blank or unrecognised tag are
+  Samples, and the run summary reports how many had no tag (#40)
+
+### Changed
+
+- **Breaking:** notebook 02 no longer accepts `CRM_TAG_PREFIX`,
+  `PHSTD_TAG_PREFIX`, `ALLOW_CRM_FLAG_COL` or `CRM_OR_SAMPLE_COL`; it stops with
+  a message naming the replacement. The `sample_type` / `crm_or_sample` column
+  no longer affects which rows are CRMs, Standards or Samples, and rows whose
+  `sample_type` is `phstd` / `ph_standard` are no longer given the CRM role.
+  Stage 1B's `classify_rows_sample` and `qc_ta_ph`'s `detect_ta_crm_rows` /
+  `detect_phstd_rows` are removed. Stage 1B and later need the `row_role`
+  column, so rerun Stage QC on outputs written before this release (#40)
+
+### Deprecated
+
+- The `row_classification` column (`SAMPLE` / `CRM` / `STD`) is now derived from
+  `row_role` and will be removed in the next release; read `row_role` instead
+  (#40)
 
 ### Fixed
 

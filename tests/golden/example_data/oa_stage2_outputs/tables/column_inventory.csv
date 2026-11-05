@@ -199,6 +199,7 @@ preferred_ta_for_analysis,object,0,0.0,1,ta_best_umolkg
 record_id,object,0,0.0,27,S001
 replicate_id,object,0,0.0,4,r1
 row_classification,object,0,0.0,3,SAMPLE
+row_role,object,0,0.0,3,SAMPLE
 safe_for_analysis_qc,bool,0,0.0,1,True
 safe_for_analysis_strict,bool,0,0.0,2,True
 salinity,float64,0,0.0,21,33.08

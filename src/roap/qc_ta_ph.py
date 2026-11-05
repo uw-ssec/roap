@@ -22,13 +22,13 @@ from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
+from . import row_roles
 from .common import (
     build_corrections_table,
     die,
     fmt,
     resolve_col,
     robust_outlier_flags,
-    safe_str_series,
     utc_stamp,
     write_text,
 )
@@ -45,14 +45,12 @@ __all__ = [
     "TaSop",
     "PhStdStatusThresholds",
     # TA CRM
-    "detect_ta_crm_rows",
     "apply_ta_sop_auto_rule",
     "apply_ta_crm_correction",
     "write_rm_ta_diff_qc_plot",
     "write_ta_markdown_report",
     # pH standard
     "ph_standard_expected",
-    "detect_phstd_rows",
     "ph_status_from_mean",
     "apply_ph_standard_qc_and_correction",
     "write_phstd_qc_plot",
@@ -428,32 +426,6 @@ class TaSop:
             raise ValueError("TaSop.reject must be greater than TaSop.no_adjust.")
 
 
-def detect_ta_crm_rows(
-    df: pd.DataFrame,
-    sample_tag_col: str,
-    crm_or_sample_col: Optional[str],
-    ta_col: str,
-    crm_tag_prefix: str = "RM",
-    allow_crm_flag_col: bool = False,
-) -> tuple[pd.Series, pd.Series]:
-    """Return detected CRM rows and usable CRM rows separately.
-
-    Detected CRM rows are identified by tag prefix or, optionally, a CRM flag
-    column. Usable CRM rows are detected CRM rows with numeric TA values.
-    """
-    tag = safe_str_series(df[sample_tag_col]).str.upper()
-    is_crm = tag.str.startswith(crm_tag_prefix.upper())
-
-    if allow_crm_flag_col and crm_or_sample_col is not None:
-        flag = safe_str_series(df[crm_or_sample_col]).str.lower()
-        is_crm = is_crm | flag.eq("crm")
-
-    ta = pd.to_numeric(df[ta_col], errors="coerce")
-    is_usable_crm = is_crm & ta.notna()
-
-    return is_crm.astype("boolean"), is_usable_crm.astype("boolean")
-
-
 def apply_ta_sop_auto_rule(
     corr: pd.Series,
     sop: TaSop,
@@ -487,25 +459,24 @@ def apply_ta_crm_correction(
     df: pd.DataFrame,
     ta_col: str,
     sample_tag_col: str,
-    crm_or_sample_col: Optional[str],
     crm_batch: str,
     crm_ta_override: Optional[float],
     group_by: Optional[str],
-    crm_tag_prefix: str,
-    allow_crm_flag_col: bool,
     require_ta_value_for_crm: bool,
     min_crm_n: int,
     mad_k: float,
     max_abs_diff: Optional[float],
     correct_only_samples: bool,
     sop: TaSop,
-    sample_flag_value: str = "sample",
     crm_values: Optional[Dict[str, float]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
     """Detect CRM rows, compute CRM correction, and apply it to eligible rows.
 
     Returns:
         (out, crm_qc, corr_table, summary)
+
+    ``df`` must carry the ``row_role`` column (``roap.row_roles``); CRM rows
+    are the rows with the CRM role.
 
     CRM detection and CRM usability are recorded separately. A CRM row with
     missing or non numeric TA is still counted as a detected CRM row. If
@@ -523,10 +494,6 @@ def apply_ta_crm_correction(
 
     ta_col = resolve_col(df, ta_col)
     sample_tag_col = resolve_col(df, sample_tag_col)
-
-    crm_or_sample_col_res: Optional[str] = None
-    if crm_or_sample_col and crm_or_sample_col in df.columns:
-        crm_or_sample_col_res = resolve_col(df, crm_or_sample_col)
 
     group_by_res: Optional[str] = None
     if group_by and group_by in df.columns:
@@ -554,20 +521,10 @@ def apply_ta_crm_correction(
     out = df.copy()
     out[ta_col] = pd.to_numeric(out[ta_col], errors="coerce")
 
-    is_crm, is_usable_crm = detect_ta_crm_rows(
-        out,
-        sample_tag_col=sample_tag_col,
-        crm_or_sample_col=crm_or_sample_col_res,
-        ta_col=ta_col,
-        crm_tag_prefix=crm_tag_prefix,
-        allow_crm_flag_col=allow_crm_flag_col,
-    )
-
-    if crm_or_sample_col_res is not None:
-        flag = safe_str_series(out[crm_or_sample_col_res]).str.lower()
-        is_sample = flag.eq(sample_flag_value.lower())
-    else:
-        is_sample = ~is_crm.fillna(False)
+    # Row roles are decided once, from the Tag prefix, before this runs (ADR-0006).
+    is_crm = row_roles.is_crm(out)
+    is_sample = row_roles.is_sample(out)
+    is_usable_crm = is_crm & out[ta_col].notna()
 
     out["crm_batch_used"] = batch_used
     out["ta_certified_umolkg"] = ta_cert
@@ -930,7 +887,6 @@ def write_ta_markdown_report(
 ## Inputs and policy
 - TA column: `{ta_col_used}`
 - sample tag column: `{sample_tag_col_used}`
-- crm or sample flag column: `{params.get("CRM_OR_SAMPLE_COL")}`
 - CRM tag prefix: `{params.get("CRM_TAG_PREFIX")}`
 - group_by: `{group_by if group_by else "None"}`
 - grouped correction: `{bool(group_by)}`
@@ -1024,12 +980,6 @@ def ph_standard_expected(
     return float("nan"), True
 
 
-def detect_phstd_rows(df: pd.DataFrame, sample_tag_col: str, tag_prefix: str) -> pd.Series:
-    """Return rows whose sample tag begins with the pH standard prefix."""
-    tag = safe_str_series(df[sample_tag_col]).str.lower()
-    return tag.str.startswith(tag_prefix.strip().lower()).astype("boolean")
-
-
 def ph_status_from_mean(mean_diff: Optional[float], thr: PhStdStatusThresholds) -> str:
     """Map a mean expected minus measured pH residual to status."""
     if mean_diff is None or pd.isna(mean_diff):
@@ -1047,18 +997,15 @@ def ph_status_from_mean(mean_diff: Optional[float], thr: PhStdStatusThresholds) 
 def apply_ph_standard_qc_and_correction(
     df: pd.DataFrame,
     buffer: str,
-    tag_prefix: str,
     ph_col: str,
     temp_col: str,
     sample_tag_col: str,
-    crm_or_sample_col: Optional[str],
     group_by: Optional[str],
     mad_k: float,
     max_abs_diff: Optional[float],
     min_std_n: int,
     correct_samples: bool,
     status_thr: PhStdStatusThresholds,
-    sample_flag_value: str = "sample",
     apply_warn_correction: bool = True,
     allow_temp_clamp: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
@@ -1066,16 +1013,15 @@ def apply_ph_standard_qc_and_correction(
 
     Returns:
         (out, phstd_qc, corr_table, summary)
+
+    ``df`` must carry the ``row_role`` column (``roap.row_roles``); pH
+    standard rows are the rows with the Standard role.
     """
     out = df.copy()
 
     ph_col = resolve_col(out, ph_col)
     temp_col = resolve_col(out, temp_col)
     sample_tag_col = resolve_col(out, sample_tag_col)
-
-    crm_or_sample_col_res: Optional[str] = None
-    if crm_or_sample_col and crm_or_sample_col in out.columns:
-        crm_or_sample_col_res = resolve_col(out, crm_or_sample_col)
 
     group_by_res: Optional[str] = None
     if group_by and group_by in out.columns:
@@ -1084,13 +1030,9 @@ def apply_ph_standard_qc_and_correction(
     out[ph_col] = pd.to_numeric(out[ph_col], errors="coerce")
     out[temp_col] = pd.to_numeric(out[temp_col], errors="coerce")
 
-    is_std = detect_phstd_rows(out, sample_tag_col=sample_tag_col, tag_prefix=tag_prefix)
-
-    if crm_or_sample_col_res is not None:
-        flag = safe_str_series(out[crm_or_sample_col_res]).str.lower()
-        is_sample = flag.eq(sample_flag_value.lower())
-    else:
-        is_sample = ~is_std.fillna(False)
+    # Row roles are decided once, from the Tag prefix, before this runs (ADR-0006).
+    is_std = row_roles.is_standard(out)
+    is_sample = row_roles.is_sample(out)
 
     out["is_phstd_row"] = is_std.astype("boolean")
     out["is_ph_sample_row"] = is_sample.astype("boolean")
@@ -1330,7 +1272,6 @@ def apply_ph_standard_qc_and_correction(
 
     summary: Dict[str, Any] = {
         "buffer": buffer.lower(),
-        "tag_prefix": tag_prefix,
         "ph_col_used": ph_col,
         "temp_col_used": temp_col,
         "group_by": group_by_res,
@@ -1515,7 +1456,7 @@ def write_phstd_markdown_report(
 **Workbook:** `{xlsx_path}`
 **Sheet:** `{sheet_name}`
 **Buffer:** `{ph_summary.get("buffer")}`
-**Tag prefix:** `{ph_summary.get("tag_prefix")}`
+**Standard tag prefix:** `{params.get("STANDARD_TAG_PREFIX")}`
 
 ## Status
 - Overall status: **{ph_summary.get("overall_status")}**
@@ -1533,7 +1474,6 @@ def write_phstd_markdown_report(
 ## Inputs and policy
 - pH column: `{ph_summary.get("ph_col_used")}`
 - temperature column: `{ph_summary.get("temp_col_used")}`
-- crm or sample flag column: `{params.get("CRM_OR_SAMPLE_COL")}`
 - group_by: `{ph_summary.get("group_by") if ph_summary.get("group_by") else "None"}`
 - minimum standard N: `{ph_summary.get("min_std_n")}`
 - MAD k: `{ph_summary.get("mad_k")}`

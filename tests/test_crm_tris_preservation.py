@@ -1,25 +1,7 @@
 # tests/test_crm_tris_preservation.py
 import pandas as pd
 import pytest
-from roap.stage1b import classify_rows_sample, analysis_ready_subset, STAGE1B_DEFAULTS
-
-
-def test_classify_rows_sample_preserves_crm_tris():
-    """classify_rows_sample identifies CRM/TRIS but doesn't drop them."""
-    df = pd.DataFrame({
-        "sample_id": ["S1", "S2", "RM213_1", "tris_1"],
-        "sample_type": ["sample", "sample", "crm", "std"],
-        "sample_tag": ["S1", "S2", "RM213_1", "tris_1"],
-        "ta_best_umolkg": [2300.0, 2310.0, 2200.0, 2305.0],
-        "ph_best": [8.1, 8.05, 8.08, 8.06],
-    })
-
-    is_sample = classify_rows_sample(df)
-    # CRM and TRIS rows should be "CRM"/"STD" (not "SAMPLE")
-    assert is_sample.iloc[0] == "SAMPLE"   # S1
-    assert is_sample.iloc[1] == "SAMPLE"   # S2
-    assert is_sample.iloc[2] == "CRM"      # RM213_1 (CRM)
-    assert is_sample.iloc[3] == "STD"      # tris_1 (STD)
+from roap.stage1b import analysis_ready_subset, STAGE1B_DEFAULTS
 
 
 def test_analysis_ready_subset_preserves_all_rows():
@@ -28,6 +10,7 @@ def test_analysis_ready_subset_preserves_all_rows():
         "sample_id": ["S1", "S2", "RM213_1", "tris_1"],
         "sample_type": ["sample", "sample", "crm", "std"],
         "sample_tag": ["S1", "S2", "RM213_1", "tris_1"],
+        "row_role": ["SAMPLE", "SAMPLE", "CRM", "STANDARD"],
         "ta_best_umolkg": [2300.0, 2310.0, 2200.0, 2305.0],
         "ph_best": [8.1, 8.05, 8.08, 8.06],
         "salinity": [35.0]*4,

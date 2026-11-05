@@ -52,6 +52,7 @@ def test_stage1b_preserves_existing_carbonate_solver_metadata() -> None:
     """Stage 1B must not erase existing solver and input pair provenance."""
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "sample_tag": ["S001"],
             "ta": [2300.0],
             "pH_lab": [8.05],
@@ -78,6 +79,7 @@ def test_stage1b_does_not_invent_solver_metadata_by_default() -> None:
     """Missing solver provenance should remain missing unless explicitly configured."""
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "sample_tag": ["S001"],
             "ta": [2300.0],
             "pH_lab": [8.05],
@@ -109,6 +111,7 @@ def test_missing_ph_qc_status_does_not_block_all_rows_by_default() -> None:
     """The default QC gate should require TA status but not absent pH status."""
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "is_sample_row": [True],
             "ta_qc_status_norm": ["NO_ADJUST"],
             "ta_best_umolkg": [2300.0],
@@ -136,6 +139,7 @@ def test_required_ph_qc_status_can_be_enabled_by_config() -> None:
 
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "is_sample_row": [True],
             "ta_qc_status_norm": ["NO_ADJUST"],
             "ta_best_umolkg": [2300.0],
@@ -183,6 +187,7 @@ def test_phstd_original_fallback_is_not_treated_as_corrected_ph() -> None:
     """A copied original pH fallback should not count as corrected pH."""
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "sample_tag": ["S001"],
             "ta": [2300.0],
             "ph_corrected_from_phstd": [8.05],
@@ -216,6 +221,7 @@ def test_phstd_corrected_value_is_tracked_as_corrected_ph() -> None:
     """A true pH standard corrected value should be identifiable downstream."""
     df = pd.DataFrame(
         {
+            "row_role": ["SAMPLE"],  # decided at Stage QC (ADR-0006)
             "sample_tag": ["S001"],
             "ta": [2300.0],
             "ph_corrected_from_phstd": [8.06],

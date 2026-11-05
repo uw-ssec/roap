@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from . import row_roles
 from .common import (
     coalesce_numeric_series,
     coalesce_string_series,
@@ -44,7 +45,6 @@ __all__ = [
     "build_numeric_candidates_for_stage1b",
     "add_status_normalizations",
     "add_best_analysis_fields",
-    "classify_rows_sample",
     "add_provenance_fields",
     "validate_ta_units",
     "add_scale_flags",
@@ -531,58 +531,6 @@ def add_best_analysis_fields(
 
 
 # =============================================================================
-# Row classification
-# =============================================================================
-
-
-def classify_rows_sample(df: pd.DataFrame) -> pd.Series:
-    """Classify rows that should participate in environmental analysis.
-
-    Explicit sample_type labels are used when available. Blank sample_type values
-    fall back to the QC flags: a row is treated as a sample if it is neither a
-    TA CRM nor a pH standard.
-
-    Returns a series with values "SAMPLE", "CRM", or "STD".
-    """
-    is_crm = _bool_series(df, "is_ta_crm_row", default=False)
-
-    if "sample_type" not in df.columns:
-        # No sample_type column: CRM rows are "CRM", others are "SAMPLE"
-        return pd.Series(
-            ["CRM" if c else "SAMPLE" for c in is_crm],
-            index=df.index,
-            dtype=object,
-        )
-
-    sample_type = safe_str_series(df["sample_type"]).str.lower()
-
-    explicit_sample = sample_type.isin(
-        ["sample", "s", "environmental", "water_sample", "water sample"]
-    )
-    explicit_crm = sample_type.isin(
-        ["crm", "rm", "phstd", "ph_standard", "ph standard", "blank"]
-    )
-    explicit_std = sample_type.isin(
-        ["tris", "tris_certified", "tris_std", "tris_std_ar", "std"]
-    )
-
-    # Build result: SAMPLE for explicit samples, CRM for explicit CRM,
-    # STD for explicit STD/TRIS, fallback to QC flags for untagged rows
-    out = pd.Series("SAMPLE", index=df.index, dtype=object)
-    out[explicit_crm & ~explicit_std] = "CRM"
-    out[explicit_std] = "STD"
-
-    # Fallback: rows not explicitly tagged use QC flags
-    fallback_mask = ~explicit_sample & ~explicit_crm & ~explicit_std
-    # (label-aligned masks: the frame need not have a RangeIndex, #38)
-    is_std = _bool_series(df, "is_phstd_row", default=False)
-    out[fallback_mask & is_std] = "STD"
-    out[fallback_mask & is_crm] = "CRM"
-
-    return out
-
-
-# =============================================================================
 # Chemistry provenance and role flags
 # =============================================================================
 
@@ -594,9 +542,8 @@ def add_provenance_fields(
     """Add unit, scale, calculation input, and role provenance in place."""
     meta: Dict[str, Any] = {}
 
-    # classify_rows_sample returns a "SAMPLE"/"CRM"/"STD" label; readers expect
-    # a boolean, as in the prototype (#47). row_classification keeps the label.
-    df["is_sample_row"] = classify_rows_sample(df).eq("SAMPLE").astype("boolean")
+    # Row roles are decided once at Stage QC from the Tag prefix (ADR-0006).
+    df["is_sample_row"] = row_roles.is_sample(df).astype("boolean")
 
     ta_units_cols = existing_columns(df, config.get("ta_unit_candidates", []))
     ta_units_raw, ta_units_source = coalesce_string_series(df, ta_units_cols)
@@ -888,9 +835,9 @@ def analysis_ready_subset(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFr
     # Keep ALL rows (not just samples) to preserve CRM/TRIS rows with appropriate verdicts
     out = df.copy()
 
-    # Classify rows: SAMPLE, CRM, or STD (based on sample_type or QC flags)
-    from .stage1b import classify_rows_sample as _classify_rows_sample
-    out["row_classification"] = _classify_rows_sample(df)
+    # Deprecated: row_role replaces row_classification, which is kept for one
+    # release with its old SAMPLE/CRM/STD labels (#40).
+    out["row_classification"] = row_roles.legacy_classification(df)
 
     policy = config.get("analysis_policy", {})
     allowed_qc_status = set(

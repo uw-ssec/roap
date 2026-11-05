@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
+from . import row_roles
 from .common import (
     empty_float_series,
     empty_string_series,
@@ -1262,12 +1263,18 @@ def add_readiness_status(
     status = status.where(~severe, "FAIL")
     out["analysis_audit_status"] = status
 
-    # Set audit status based on row classification (from Stage 1B)
-    # CRM rows get CRM_QC, TRIS rows get STD_QC, sample rows get PASS/REVIEW/FAIL
-    if "row_classification" in out.columns:
+    # Set audit status from the Row role (decided at Stage QC, ADR-0006).
+    # CRM rows get CRM_QC, Standard rows get STD_QC, Samples get PASS/REVIEW/FAIL
+    # Inputs written before row_role existed fall back to the deprecated
+    # row_classification labels.
+    if row_roles.ROW_ROLE_COL in out.columns or "row_classification" in out.columns:
         audit_status = out["analysis_audit_status"].copy()
-        crm_mask = out["row_classification"].eq("CRM_QC") | out["row_classification"].eq("CRM")
-        std_mask = out["row_classification"].eq("STD_QC") | out["row_classification"].eq("STD")
+        if row_roles.ROW_ROLE_COL in out.columns:
+            crm_mask = row_roles.is_crm(out)
+            std_mask = row_roles.is_standard(out)
+        else:
+            crm_mask = out["row_classification"].isin(["CRM", "CRM_QC"])
+            std_mask = out["row_classification"].isin(["STD", "STD_QC"])
         # CRM rows should have CRM_QC verdict
         audit_status[crm_mask] = "CRM_QC"
         # TRIS rows should have STD_QC verdict

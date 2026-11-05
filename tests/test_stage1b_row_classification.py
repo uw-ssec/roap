@@ -1,25 +1,22 @@
 # tests/test_stage1b_row_classification.py
-"""Stage 1B row classification stop-gaps until roap.row_roles (#40) replaces them."""
+"""Stage 1B reads Row roles from ``row_role`` instead of classifying rows (#40)."""
 
 from __future__ import annotations
 
 import copy
 
 import pandas as pd
+import pytest
 
-from roap.stage1b import (
-    STAGE1B_DEFAULTS,
-    add_presence_flags,
-    add_provenance_fields,
-    classify_rows_sample,
-)
+import roap.stage1b as stage1b
+from roap.stage1b import STAGE1B_DEFAULTS, add_presence_flags, add_provenance_fields
 
 
 def test_crm_and_std_rows_are_not_sample_rows() -> None:
     """is_sample_row is a boolean, so CRM/STD rows are not flagged as samples (#47)."""
     df = pd.DataFrame(
         {
-            "sample_type": ["sample", "crm", "std"],
+            "row_role": ["SAMPLE", "CRM", "STANDARD"],
             "ta_best_umolkg": [2300.0, float("nan"), float("nan")],
             "ph_best": [8.1, float("nan"), float("nan")],
         }
@@ -36,32 +33,24 @@ def test_crm_and_std_rows_are_not_sample_rows() -> None:
     assert df["flag_core_chemistry_missing"].tolist() == [False, False, False]
 
 
-def _untagged_frame(index: list) -> pd.DataFrame:
-    """Rows with no usable sample_type label fall back to the QC flags."""
-    return pd.DataFrame(
+def test_sample_type_is_not_a_row_role_signal() -> None:
+    """sample_type no longer decides anything: row_role is the only input (ADR-0006)."""
+    df = pd.DataFrame(
         {
-            "sample_type": ["sample", None, "", "unknown", "  ", None],
-            "is_ta_crm_row": [False, False, False, False, True, False],
-            "is_phstd_row": [False, False, False, False, False, True],
+            "row_role": ["SAMPLE", "SAMPLE", "STANDARD"],
+            "sample_type": ["crm", "phstd", "sample"],
         },
-        index=index,
+        index=[10, 3, 7],
     )
+    add_provenance_fields(df, copy.deepcopy(STAGE1B_DEFAULTS))
+    assert df["is_sample_row"].tolist() == [True, True, False]
 
 
-# blank -> SAMPLE, empty -> SAMPLE, unrecognised -> SAMPLE, CRM flag -> CRM,
-# pH standard flag -> STD (the docstring's QC-flag fallback, as in the prototype).
-EXPECTED_FALLBACK = ["SAMPLE", "SAMPLE", "SAMPLE", "SAMPLE", "CRM", "STD"]
+def test_missing_row_role_fails_with_a_clear_message() -> None:
+    df = pd.DataFrame({"sample_type": ["sample"]})
+    with pytest.raises(KeyError, match="row_role"):
+        add_provenance_fields(df, copy.deepcopy(STAGE1B_DEFAULTS))
 
 
-def test_untagged_rows_fall_back_to_qc_flags() -> None:
-    """Blank or unrecognised sample_type on a non-CRM row no longer raises NameError (#38)."""
-    out = classify_rows_sample(_untagged_frame(list(range(6))))
-    assert out.tolist() == EXPECTED_FALLBACK
-
-
-def test_untagged_rows_with_non_range_index() -> None:
-    """The fallback uses label-aligned masks, not positional .iloc (#38)."""
-    index = [10, 3, 7, 42, 0, 5]
-    out = classify_rows_sample(_untagged_frame(index))
-    assert out.index.tolist() == index
-    assert out.tolist() == EXPECTED_FALLBACK
+def test_classify_rows_sample_is_removed() -> None:
+    assert not hasattr(stage1b, "classify_rows_sample")
