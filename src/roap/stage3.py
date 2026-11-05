@@ -30,8 +30,8 @@ those provenance issues separately.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -39,18 +39,29 @@ from .common import (
     empty_bool_series,
     empty_float_series,
     empty_string_series,
+    md_table_from_df,
+    normalize_columns,
     robust_outlier_flags,
     safe_str_series,
+    utc_stamp,
 )
-from .schema import DEFAULT_CONFIG, normalize_carbonate_unit, normalize_ph_scale
+from .schema import DEFAULT_CONFIG, assert_ph_scale_consistency, normalize_carbonate_unit, normalize_ph_scale
+from .stage_result import StageResult, json_text, package_versions
+
+if TYPE_CHECKING:
+    from .stage_config import StageConfig
 
 __all__ = [
+    "NOTEBOOK",
     "STAGE3_DEFAULTS",
     "CarbonateIntegrityThresholds",
     "add_canonical_helper_columns",
     "carbonate_integrity_checks",
     "build_qc_summary",
+    "run",
 ]
+
+NOTEBOOK = "07_stage3"
 
 
 # =============================================================================
@@ -1229,3 +1240,211 @@ def build_qc_summary(
         qc["pct_any_carbonate_issue"] = safe_pct("n_any_carbonate_issue", "n_rows")
 
     return qc, keys
+
+
+# =============================================================================
+# Stage run (#42)
+# =============================================================================
+
+_ID_COLUMNS = (
+    "record_id", "sample_id", "cruise_id", "transect_id", "station_id",
+    "sample_date", "sample_month", "depth_round_m", "lat", "lon",
+)
+
+
+def run(
+    df: pd.DataFrame,
+    stage_config: "StageConfig",
+    *,
+    source: Optional[str] = None,
+    depth_round_decimals: int = 1,
+) -> StageResult:
+    """Run Stage 3 on Stage 2's enhanced frame; no disk IO.
+
+    ``source`` labels the input in the frame's ``source_file_stage3`` column,
+    the report and the run bundle. Raises ``ValueError`` for another Stage's
+    config or a negative ``depth_round_decimals``; a missing required column
+    or a pH-scale disagreement with the schema stops with ``SystemExit`` as
+    before.
+    """
+    # Stage 3 shares Stage 2's alias, presence and inventory steps.
+    from .stage2 import (
+        ensure_required_columns,
+        make_column_inventory,
+        make_presence_table,
+        materialize_canonical_aliases,
+    )
+
+    if stage_config.stage != "stage3":
+        raise ValueError(f"Stage 3 needs the stage3 config, got {stage_config.stage}.")
+    if depth_round_decimals < 0:
+        raise ValueError(f"DEPTH_ROUND_DECIMALS must be >= 0, got {depth_round_decimals}")
+    config = stage_config.config
+    required_cols = config.get("required_stage3_columns", config.get("required_stage2_columns", []))
+    expected_cols = config.get("expected_stage3_columns", config.get("expected_stage2_columns", []))
+    notes: List[str] = []
+
+    df = normalize_columns(df.copy())
+    df["source_file_stage3"] = str(source) if source is not None else ""
+    df["stage3_processed_utc"] = utc_stamp()
+    df, alias_resolution = materialize_canonical_aliases(df, config["canonical_aliases"], notes)
+    ensure_required_columns(df, required_cols)
+
+    presence_df = make_presence_table(df, required=required_cols, expected=expected_cols)
+    missing_opt = presence_df.loc[(~presence_df["required"]) & (~presence_df["present"]), "column"].tolist()
+    if missing_opt:
+        notes.append("Optional expected columns not found: " + ", ".join(missing_opt))
+
+    df = add_canonical_helper_columns(df, notes, depth_round_decimals=depth_round_decimals)
+    inventory_df = make_column_inventory(df)
+
+    thr = CarbonateIntegrityThresholds.from_config(config)
+    # AUDIT FIX N-6: the accepted pH scales must agree with the schema
+    # default; mixing scales without a documented conversion corrupts
+    # carbonate-system calculations (Moras et al. 2023).
+    accepted_ph_scales = assert_ph_scale_consistency(
+        config.get("accepted_ph_scales", ["total"]),
+        DEFAULT_CONFIG.get("accepted_ph_scales", ["total"]),
+        source_names=["stage3_config", "schema_default"],
+    )
+    flags_df, summary, dic_bad, ph_bad = carbonate_integrity_checks(df, thr, accepted_ph_scales=accepted_ph_scales)
+    for col in flags_df.columns:
+        df[col] = flags_df[col]
+
+    qc_df, keys_used = build_qc_summary(df, config.get("qc_group_keys", []))
+    if keys_used:
+        df = df.merge(qc_df, on=keys_used, how="left", suffixes=("", "_grp"))
+    else:
+        for col in qc_df.columns:
+            df[col] = qc_df.iloc[0][col]
+
+    id_cols = [c for c in _ID_COLUMNS if c in df.columns]
+    integrity_flags = pd.concat([df[id_cols].reset_index(drop=True), flags_df.reset_index(drop=True)], axis=1)
+    alias_df = pd.DataFrame(
+        {"canonical_column": list(alias_resolution.keys()), "resolved_from": list(alias_resolution.values())}
+    )
+
+    notes_md = "\n".join(f"- {n}" for n in notes) if notes else "- (none)"
+    report = f"""# Stage 3 Preprocessing Report
+
+**Generated:** {utc_stamp()}
+**Input:** `{source}`
+**Rows:** {len(df):,}  **Columns:** {df.shape[1]:,}
+
+## What this stage does
+Runs row-wise internal-consistency checks of the carbonate-system
+chemistry. **Does not rebuild any core chemistry field.**
+
+Stage 3 separates chemistry consistency flags from provenance audit flags.
+Unknown `carbonate_solver` and unknown `carbon_input_pair_used` are carried
+forward for Stage 4, but they are not included in the strict Stage 3
+chemistry roll-up.
+
+## Carbonate integrity -- DIC species
+| Metric | Count |
+|--------|------:|
+| DIC columns present | {summary["dic_columns_present"]} |
+| Rows with all values | {summary["n_dic_values_present"]:,} |
+| Checkable rows | {summary["n_dic_checkable"]:,} |
+| Unit missing | {summary["n_dic_unit_missing"]:,} |
+| Unit mismatch | {summary["n_dic_unit_mismatch"]:,} |
+| Non-positive DIC | {summary["n_dic_nonpositive"]:,} |
+| Negative species | {summary["n_any_negative_species"]:,} |
+| Threshold inconsistent | {summary["n_dic_inconsistent"]:,} |
+| Robust outliers | {summary["n_dic_inconsistent_robust"]:,} |
+
+Thresholds: abs={summary["dic_abs_tol"]} umol/kg, rel={summary["dic_rel_tol"]:.3f},
+MAD k={summary["dic_mad_k"]}
+
+## Carbonate integrity -- pH diagnostics
+| Metric | Count |
+|--------|------:|
+| pH columns present | {summary["ph_columns_present"]} |
+| Rows with values | {summary["n_ph_values_present"]:,} |
+| Checkable rows | {summary["n_ph_checkable"]:,} |
+| Strict checkable rows | {summary["n_ph_strict_checkable"]:,} |
+| Observed pH missing scale | {summary["n_ph_best_missing_scale_context"]:,} |
+| Calculated pH missing scale | {summary["n_ph_co2sys_missing_scale_context"]:,} |
+| Observed pH unexpected scale | {summary["n_ph_best_scale_unexpected"]:,} |
+| Calculated pH unexpected scale | {summary["n_ph_co2sys_scale_unexpected"]:,} |
+| Scale mismatch | {summary["n_ph_scale_mismatch"]:,} |
+| Threshold mismatch | {summary["n_ph_diag_mismatch"]:,} |
+| Strict threshold mismatch | {summary["n_ph_diag_mismatch_strict"]:,} |
+| Robust outliers | {summary["n_ph_diag_mismatch_robust"]:,} |
+
+Threshold: tol={summary["ph_diag_tol"]}, MAD k={summary["ph_mad_k"]}
+
+Accepted pH scales: `{accepted_ph_scales}`
+
+## Combined flags
+| Flag | Rows |
+|------|-----:|
+| Stage 2 replicate conflict carried | {summary["n_stage2_replicate_conflict_carried"]:,} |
+| Solver unknown | {summary["n_solver_unknown"]:,} |
+| Carbon input pair unknown | {summary["n_carbon_input_pair_unknown"]:,} |
+| Any carbonate issue | {summary["n_any_carbonate_issue"]:,} |
+| Any carbonate issue strict | {summary["n_any_carbonate_issue_strict"]:,} |
+
+## QC summary by group
+Group keys used: `{keys_used}`
+
+{md_table_from_df(qc_df.head(20), max_rows=200)}
+
+## Canonical field presence
+{md_table_from_df(presence_df, max_rows=200)}
+
+## Column inventory top 30 by missingness
+{md_table_from_df(inventory_df.head(30), max_rows=200)}
+
+## Notes
+{notes_md}
+
+## Main outputs
+- `data/enhanced.csv`: Stage 4 reads this
+- `tables/carbonate_integrity_flags.csv`: integrity flags
+- `tables/dic_species_mismatches.csv`: DIC mismatches
+- `tables/ph_diag_mismatches.csv`: pH mismatches
+"""
+
+    manifest = {
+        "notebook": NOTEBOOK,
+        "generated_utc": utc_stamp(),
+        "input_csv": source,
+        "config_source": stage_config.source,
+        "config_warnings": list(stage_config.warnings),
+        "parameters": {"DEPTH_ROUND_DECIMALS": depth_round_decimals},
+        "thresholds": asdict(thr),
+        "accepted_ph_scales": accepted_ph_scales,
+        "alias_resolution": alias_resolution,
+        "qc_group_keys_used": keys_used,
+        "integrity_summary": summary,
+        "row_counts": {
+            "n_rows": int(len(df)),
+            "n_dic_mismatch_rows": int(len(dic_bad)),
+            "n_ph_mismatch_rows": int(len(ph_bad)),
+            "n_qc_groups": int(len(qc_df)),
+            "n_any_carbonate_issue": summary["n_any_carbonate_issue"],
+            "n_any_carbonate_issue_strict": summary["n_any_carbonate_issue_strict"],
+        },
+        "notes": notes,
+        "package_versions": package_versions(),
+    }
+    return StageResult(
+        stage="stage3",
+        data={"data/enhanced.csv": df},
+        tables={
+            "tables/carbonate_integrity_flags.csv": integrity_flags,
+            "tables/qc_summary_by_group.csv": qc_df,
+            "tables/dic_species_mismatches.csv": dic_bad,
+            "tables/ph_diag_mismatches.csv": ph_bad,
+            "tables/column_inventory.csv": inventory_df,
+            "tables/canonical_presence.csv": presence_df,
+            "tables/alias_resolution.csv": alias_df,
+        },
+        reports={"reports/report.md": report},
+        texts={"logs/effective_config.json": json_text(config)},
+        manifest=manifest,
+        input_file=source,
+        config_files=[stage_config.source],
+        bundle_name=NOTEBOOK,
+    )
