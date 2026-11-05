@@ -997,7 +997,7 @@ def check_config_compatibility(config: dict, config_name: str) -> None:
         current = pkg_version("roap")
         try:
             satisfied = _version_satisfies(current, required)
-        except InvalidVersion as exc:
+        except (InvalidVersion, ValueError) as exc:
             raise SystemExit(
                 f"Config '{config_name}' has an invalid compatible_pipeline_version "
                 f"{required!r}: {exc}"
@@ -1014,9 +1014,13 @@ def _version_satisfies(current: str, required: str) -> bool:
     # (0.2.0), zero-padding is ignored (2026.09.0 == 2026.9.0), and a git build
     # between tags (2026.11.1.dev3, from hatch-vcs) sorts before its release.
     # Raises InvalidVersion for a malformed version on either side.
+    # Raises ValueError for an unsupported operator.
+    required = str(required).strip()
     if required.startswith(">="):
         return Version(current) >= Version(required[2:].strip())
 
     if required.startswith("=="):
         return Version(current) == Version(required[2:].strip())
-    return True
+    # Any other spelling (">", "<=", "~=", a bare version, ...) used to pass
+    # silently; it is an error so a requirement is never ignored (#41).
+    raise ValueError("supported forms are '>=X' and '==X'")
