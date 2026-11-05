@@ -166,15 +166,14 @@ def load_stage_config(
     if source is not None:
         user = _read_mapping(Path(source))
         _check_version(user, source, warnings)
+        _normalize_blocks(stage, user, source)
         _check_keys(stage, user, defaults, source)
 
     config = deep_update(defaults, user)
 
     range_policy = None
     if _RANGE_DEFAULTS[stage] is not None:
-        overrides = user.get("range_policy") or {}
-        if not isinstance(overrides, Mapping):
-            _fail(f"{source}: range_policy must be a mapping, got {type(overrides).__name__}.")
+        overrides = user.get("range_policy", {})
         try:
             range_policy = RangePolicy.from_mapping({**_RANGE_DEFAULTS[stage], **overrides})
         except (TypeError, ValueError) as exc:
@@ -245,6 +244,25 @@ def _check_version(config: Mapping[str, Any], source: str, warnings: List[str]) 
     check_config_compatibility(dict(config), source)
 
 
+def _normalize_blocks(stage: str, user: Dict[str, Any], source: str) -> None:
+    """Make a Stage's mapping blocks safe to merge and read.
+
+    An empty block (``parameters:`` with nothing under it) loads as None and
+    becomes an empty mapping, so the Stage uses its defaults. Any other
+    non-mapping value is an error rather than being skipped as falsy.
+    """
+    blocks = ["range_policy"]
+    if stage == "qc":
+        blocks.append("parameters")
+    for key in blocks:
+        if key not in user:
+            continue
+        if user[key] is None:
+            user[key] = {}
+        elif not isinstance(user[key], Mapping):
+            _fail(f"{source}: '{key}' must be a mapping, got {type(user[key]).__name__}.")
+
+
 def _check_keys(
     stage: str, user: Mapping[str, Any], defaults: Mapping[str, Any], source: str
 ) -> None:
@@ -260,9 +278,7 @@ def _check_keys(
 
     if stage != "qc":
         return
-    params = user.get("parameters") or {}
-    if not isinstance(params, Mapping):
-        _fail(f"{source}: 'parameters' must be a mapping, got {type(params).__name__}.")
+    params = user.get("parameters", {})
     for key in params:
         if key in REMOVED_QC_PARAMETERS:
             _fail(f"{source}: parameter {key} was removed: {REMOVED_QC_PARAMETERS[key]}")

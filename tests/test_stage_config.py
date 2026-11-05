@@ -147,6 +147,34 @@ def test_qc_parameters_override_and_are_returned(tmp_path) -> None:
     assert sc.load_stage_config("qc", path).config["parameters"] == {"PH_COL": "ph_observed", "MIN_CRM_N": 3}
 
 
+def test_qc_empty_parameters_block_means_defaults(tmp_path) -> None:
+    path = tmp_path / "02_ta_ph_qc.yaml"
+    path.write_text('compatible_pipeline_version: ">=0.2.0"\nparameters:\n', encoding="utf-8")
+    assert sc.load_stage_config("qc", path).config["parameters"] == {}
+
+
+@pytest.mark.parametrize("value", [[], False, 0, "", ["PH_COL"], "PH_COL"])
+def test_qc_non_mapping_parameters_are_errors_even_when_falsy(tmp_path, value) -> None:
+    with pytest.raises(SystemExit, match="'parameters' must be a mapping"):
+        sc.load_stage_config("qc", _write(tmp_path, {**OK_VERSION, "parameters": value}))
+
+
+@pytest.mark.parametrize("stage", ["stage1a", "stage1b", "stage4"])
+def test_empty_range_policy_block_means_stage_defaults(tmp_path, stage) -> None:
+    path = tmp_path / "cfg.yaml"
+    path.write_text('compatible_pipeline_version: ">=0.2.0"\nrange_policy:\n', encoding="utf-8")
+    resolved = sc.load_stage_config(stage, path)
+    assert resolved.range_policy == sc.load_stage_config(stage).range_policy
+    if "range_policy" in sc.stage_defaults(stage):
+        assert resolved.config["range_policy"] == sc.stage_defaults(stage)["range_policy"]
+
+
+@pytest.mark.parametrize("value", [[], False, 0, "", [1]])
+def test_non_mapping_range_policy_is_an_error_even_when_falsy(tmp_path, value) -> None:
+    with pytest.raises(SystemExit, match="'range_policy' must be a mapping"):
+        sc.load_stage_config("stage4", _write(tmp_path, {**OK_VERSION, "range_policy": value}))
+
+
 def test_qc_parameters_match_notebook_02_parameters_cell() -> None:
     nb = json.loads((REPO_ROOT / "notebooks" / "02_ta_ph_qc.ipynb").read_text(encoding="utf-8"))
     cell = next(c for c in nb["cells"] if "parameters" in c.get("metadata", {}).get("tags", []))
