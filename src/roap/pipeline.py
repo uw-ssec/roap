@@ -84,9 +84,25 @@ def _crm_values_path(
     return _default_crm_values()
 
 
+def _qc_sheet(cfg: StageConfig, sheet: Union[int, str]) -> Union[int, str]:
+    """The sheet Stage QC reads: the QC config's ``SHEET`` wins over ``sheet``.
+
+    Normalised as notebook 02 does: "all", else an integer index when the
+    value parses as one, else a sheet name.
+    """
+    value = (cfg.config.get("parameters") or {}).get("SHEET", sheet)
+    if str(value).strip().lower() == "all":
+        return "all"
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
 def _run_qc(
     input_xlsx: Path, sheet: Union[int, str], out_dir: Path, cfg: StageConfig, config_dir: Optional[Path]
 ) -> StageResult:
+    """Run Stage QC on ``sheet``, already resolved with :func:`_qc_sheet`."""
     params = dict(cfg.config.get("parameters") or {})
     qc_params = qc_ta_ph.qc_run_parameters(params)
     crm_path = _crm_values_path(params, config_dir, input_xlsx)
@@ -98,7 +114,7 @@ def _run_qc(
         {
             "XLSX_PATH": str(input_xlsx),
             "OUT_DIR": str(out_dir),
-            "SHEET": sheet,
+            "SHEET": params.get("SHEET", sheet),
             "CONFIG_PATH": cfg.source,
             "CRM_VALUES_CONFIG": str(crm_path) if crm_path is not None else None,
         }
@@ -111,15 +127,18 @@ def _qc_derived_csv(qc_out: Path, input_xlsx: Path, sheet: Union[int, str]) -> P
     from .common import safe_sheet_name
 
     names = pd.ExcelFile(input_xlsx, engine="openpyxl").sheet_names
-    if isinstance(sheet, int):
+    if sheet == "all":
+        name = None
+    elif isinstance(sheet, int):
         if not 0 <= sheet < len(names):
             raise SystemExit(f"Sheet index {sheet} is out of range. Workbook has {len(names)} sheets.")
         name = names[sheet]
     else:
         name = str(sheet)
-    expected = qc_out / f"sheet_{safe_sheet_name(name)}" / "data" / "derived.csv"
-    if expected.is_file():
-        return expected
+    if name is not None:
+        expected = qc_out / f"sheet_{safe_sheet_name(name)}" / "data" / "derived.csv"
+        if expected.is_file():
+            return expected
     matches = sorted(qc_out.glob("*/data/derived.csv"))
     if len(matches) == 1:
         return matches[0]
@@ -208,6 +227,13 @@ def run_pipeline(
     stages_run: Dict[str, Path] = {}
     todo: List[str] = list(STAGE_ORDER[STAGE_ORDER.index(start_from):])
 
+    # The QC config's SHEET wins over ``sheet`` (file over caller, as in
+    # notebook 02). Resolve it once so the QC read, the manifest and the
+    # Stage 1A handoff agree, also when the run starts after Stage QC.
+    qc_cfg_path = _stage_config_path(cfg_dir, _STAGES["02"][0], lambda _msg: None)
+    qc_cfg = load_stage_config("qc", qc_cfg_path) if start_from == "02" or qc_cfg_path else None
+    qc_sheet = _qc_sheet(qc_cfg, sheet) if qc_cfg is not None else sheet
+
     for stage in todo:
         stem, _ = _STAGES[stage]
         out_dir = dirs[stage]
@@ -215,8 +241,8 @@ def run_pipeline(
         log(f"---- Stage {stage} ({stem}) -> {out_dir}")
 
         if stage == "02":
-            cfg = load_stage_config("qc", cfg_path)
-            result = _run_qc(input_xlsx, sheet, out_dir, cfg, cfg_dir)
+            cfg = qc_cfg
+            result = _run_qc(input_xlsx, qc_sheet, out_dir, cfg, cfg_dir)
             for warning in cfg.warnings:
                 log(f"WARNING: {warning}")
             write_stage_result(result, out_dir, parquet=False)
@@ -224,7 +250,7 @@ def run_pipeline(
             continue
 
         if stage == "04":
-            input_csv = _require(_qc_derived_csv(dirs["02"], input_xlsx, sheet), "Stage 04")
+            input_csv = _require(_qc_derived_csv(dirs["02"], input_xlsx, qc_sheet), "Stage 04")
         else:
             input_csv = _require(
                 {

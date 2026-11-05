@@ -81,3 +81,45 @@ def test_pipeline_runs_end_to_end(tmp_path: Path) -> None:
     )
     assert set(status[status == "FAIL"].index) == EXPECTED_FAIL
     assert set(status[status == "REVIEW"].index) == EXPECTED_REVIEW
+
+
+def test_qc_config_sheet_wins_over_caller_sheet(tmp_path: Path) -> None:
+    """A QC config's SHEET selects the sheet, as in notebook 02 (file over caller).
+
+    The workbook's first sheet is a decoy with fewer Sample rows. With
+    ``parameters: {SHEET: 1}`` and the default ``sheet=0``, the QC read, the
+    manifest and the Stage 1A handoff must all use the second sheet, even
+    when the decoy's QC outputs are also present under the output root.
+    """
+    import json
+    import shutil
+
+    real = pd.read_excel(EXAMPLE_XLSX, sheet_name=0)
+    decoy = real[~real["sample_tag"].isin({"S001", "S002", "S003"})]
+    workbook = tmp_path / "two_sheets.xlsx"
+    with pd.ExcelWriter(workbook, engine="openpyxl") as writer:
+        decoy.to_excel(writer, sheet_name="decoy", index=False)
+        real.to_excel(writer, sheet_name="real", index=False)
+
+    out_root = tmp_path / "out"
+    quiet = {"log": lambda _: None}
+    # Leave the decoy's QC outputs in place, so the handoff has two sheets to choose from.
+    run_pipeline(workbook, out_root, runs_dir=out_root / "runs" / "decoy", **quiet)
+    assert len(pd.read_csv(out_root / FINAL_REL)) == 24
+
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir()
+    shutil.copy(REPO_ROOT / "configs" / "crm_certified_values.yaml", cfg_dir)
+    (cfg_dir / "02_ta_ph_qc.yaml").write_text("parameters:\n  SHEET: 1\n", encoding="utf-8")
+
+    run_pipeline(workbook, out_root, cfg_dir, runs_dir=out_root / "runs" / "real", **quiet)
+    assert len(pd.read_csv(out_root / FINAL_REL)) == 27
+
+    qc_out = out_root / "oa_prelim_data__qc_outputs"
+    manifests = [json.loads(p.read_text(encoding="utf-8")) for p in qc_out.rglob("*manifest*.json")]
+    sheets = {m["parameters"]["SHEET"] for m in manifests if "parameters" in m}
+    assert sheets == {1}, sheets
+
+    # Starting after Stage QC hands off the config's sheet too.
+    run_pipeline(workbook, out_root, cfg_dir, start_from="04", runs_dir=out_root / "runs" / "s04", **quiet)
+    assert len(pd.read_csv(out_root / FINAL_REL)) == 27
