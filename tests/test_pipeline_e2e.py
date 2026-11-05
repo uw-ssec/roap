@@ -3,14 +3,15 @@ tests/test_pipeline_e2e.py
 ==========================
 End to end smoke tests for the OA pipeline.
 
-The test runs run_pipeline.sh on the bundled example dataset and checks that
-critical outputs, manifests, reports, final audit columns, verdicts, and reason
-codes are produced as expected.
+The module runs roap.pipeline.run_pipeline in process on a freshly generated
+example dataset and checks that critical outputs, manifests, reports, final
+audit columns, verdicts, and reason codes are produced as expected. The
+run_pipeline.sh wrapper has its own end to end smoke test in
+test_run_pipeline_sh.py.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import shutil
@@ -22,9 +23,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-
-# Skip this module when the optional notebook runner is unavailable.
-pytest.importorskip("papermill")
+from roap.bundle import check_bundle
+from roap.pipeline import run_pipeline
 
 
 # =============================================================================
@@ -124,49 +124,10 @@ def _count_true(series: pd.Series) -> int:
 @pytest.fixture(scope="module")
 def pipeline_outputs(
     project_root: Path,
-    example_xlsx_path: Path,
     tmp_path_factory: pytest.TempPathFactory,
-    bash_exe: str,
 ) -> Path:
-    """Run the notebook pipeline once; tests in this module share the output."""
-    runner = project_root / "run_pipeline.sh"
-    if not runner.exists():
-        pytest.skip(f"runner not found: {runner}")
-
-    if not example_xlsx_path.exists():
-        pytest.skip(
-            f"{example_xlsx_path} not present. Run "
-            "`python examples/make_example_data.py` to regenerate it."
-        )
-
-    package_dir = project_root / "src" / "roap"
-    if not package_dir.exists():
-        pytest.fail(f"roap package directory not found: {package_dir}")
-
-    if importlib.util.find_spec("roap") is None:
-        pytest.fail(
-            "roap is not importable in the pytest process. Run "
-            "`python -m pip install -e \".[dev]\"` before running the E2E test."
-        )
-
+    """Run the pipeline once in process; tests in this module share the output."""
     out_root = _make_test_output_root(project_root, tmp_path_factory)
-
-    env = os.environ.copy()
-    env["PYTHON_BIN"] = sys.executable
-
-    venv_scripts = project_root / ".venv" / "Scripts"
-    if venv_scripts.exists():
-        env["PATH"] = str(venv_scripts) + os.pathsep + env.get("PATH", "")
-        env["VIRTUAL_ENV"] = str(project_root / ".venv")
-
-    src_path = project_root / "src"
-    env["PYTHONPATH"] = (
-        str(src_path)
-        + os.pathsep
-        + str(project_root)
-        + os.pathsep
-        + env.get("PYTHONPATH", "")
-    )
 
     generated_input_dir = out_root / "_input"
     generated_input_dir.mkdir(parents=True, exist_ok=True)
@@ -176,14 +137,8 @@ def pipeline_outputs(
     assert generator.exists(), f"Missing example data generator: {generator}"
 
     gen_result = subprocess.run(
-        [
-            sys.executable,
-            str(generator),
-            "--out",
-            str(generated_example),
-        ],
+        [sys.executable, str(generator), "--out", str(generated_example)],
         cwd=project_root,
-        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -196,30 +151,8 @@ def pipeline_outputs(
             f"--- stderr last 2000 chars ---\n{gen_result.stderr[-2000:]}"
         )
 
-    input_arg = _path_arg(generated_example, project_root)
-    output_arg = _path_arg(out_root, project_root)
-
-    result = subprocess.run(
-        [
-            bash_exe,
-            "./run_pipeline.sh",
-            input_arg,
-            output_arg,
-        ],
-        cwd=project_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    if result.returncode != 0:
-        pytest.fail(
-            f"run_pipeline.sh exited with code {result.returncode}\n"
-            f"--- stdout last 2000 chars ---\n{result.stdout[-2000:]}\n"
-            f"--- stderr last 2000 chars ---\n{result.stderr[-2000:]}"
-        )
-
+    run_dir = out_root / "runs" / "e2e"
+    run_pipeline(generated_example, out_root, runs_dir=run_dir, log=lambda _: None)
     return out_root
 
 
@@ -228,21 +161,20 @@ def pipeline_outputs(
 # =============================================================================
 
 
-def test_runner_references_notebooks_dir(project_root: Path) -> None:
-    """The runner should define NOTEBOOK_DIR and reference required notebooks."""
+def test_runner_calls_roap_run(project_root: Path) -> None:
+    """The runner should hand Stages QC to 4 to `roap run`, not papermill."""
     runner = project_root / "run_pipeline.sh"
     assert runner.exists(), f"Missing runner: {runner}"
 
     text = runner.read_text(encoding="utf-8")
 
-    assert "NOTEBOOK_DIR" in text
     assert 'NOTEBOOK_DIR="$SCRIPT_DIR/notebooks"' in text
-    assert "PYTHON_BIN" in text
     assert 'PYTHON_BIN="${PYTHON_BIN:-python}"' in text
-    assert "resolve_qc_sheet_folder" in text
+    assert "-m roap run" in text
+    assert "--runs-dir" in text
     assert "analysis_ready.csv" in text
 
-    expected_notebook_names = [
+    stage_notebooks = [
         "02_ta_ph_qc.ipynb",
         "04_stage1a.ipynb",
         "05_stage1b.ipynb",
@@ -250,9 +182,9 @@ def test_runner_references_notebooks_dir(project_root: Path) -> None:
         "07_stage3.ipynb",
         "08_stage4.ipynb",
     ]
-
-    missing = [name for name in expected_notebook_names if name not in text]
-    assert not missing, f"run_pipeline.sh does not reference notebooks: {missing}"
+    present = [name for name in stage_notebooks if name in text]
+    assert not present, f"run_pipeline.sh still runs Stage notebooks: {present}"
+    assert "generate_run_bundle_manifest" not in text, "run bundle belongs to run_pipeline"
 
 
 def test_runner_dry_run_succeeds(
@@ -304,8 +236,8 @@ def test_runner_dry_run_succeeds(
         f"--- stderr last 2000 chars ---\n{result.stderr[-2000:]}"
     )
     assert "Dry run complete" in result.stdout
-    assert "02_ta_ph_qc.ipynb" in result.stdout
-    assert "08_stage4.ipynb" in result.stdout
+    assert "-m roap run" in result.stdout
+    assert "--start-from 02" in result.stdout
 
 
 # =============================================================================
@@ -389,13 +321,14 @@ def test_data_folders_do_not_contain_notebooks(pipeline_outputs: Path) -> None:
     assert not bad_paths, f"Notebook unexpectedly written to data folder: {bad_paths}"
 
 
-def test_project_runs_directory_contains_executed_notebooks(project_root: Path) -> None:
-    """At least one Papermill run notebook should be written under project runs/."""
-    runs_root = project_root / "runs"
-    assert runs_root.exists(), f"Missing runs directory: {runs_root}"
-
-    run_notebooks = list(runs_root.glob("*/*.run.ipynb"))
-    assert run_notebooks, "No executed Papermill notebooks found under runs/"
+def test_run_bundle_is_written_and_verifies(pipeline_outputs: Path) -> None:
+    """run_pipeline writes a run bundle that covers the run and verifies."""
+    run_dir = pipeline_outputs / "runs" / "e2e"
+    assert (run_dir / "run_bundle_manifest.json").exists(), f"Missing run bundle in {run_dir}"
+    report = check_bundle(run_dir)
+    assert report["valid"], report
+    kinds = {check["kind"] for check in report["checks"]}
+    assert {"input", "output"} <= kinds, kinds
 
 
 # =============================================================================

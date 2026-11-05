@@ -34,6 +34,47 @@ def main(
 
 
 @app.command()
+def run(
+    input_xlsx: Path = typer.Argument(..., help="Path to the input Excel workbook"),
+    output_root: Path = typer.Argument(..., help="Directory for every Stage's outputs"),
+    config_dir: Optional[Path] = typer.Option(
+        None, "--config-dir", "-c", help="Directory with per-Stage configs (02_ta_ph_qc.yaml ... 08_stage4.yaml)"
+    ),
+    sheet: int = typer.Option(0, "--sheet", min=0, help="Zero-based Excel sheet index"),
+    start_from: str = typer.Option("02", "--start-from", help="Skip Stages before this one: 02, 04, 05, 06, 07 or 08"),
+    no_parquet: bool = typer.Option(False, "--no-parquet", help="Write CSV only for Stages 1A to 4"),
+    runs_dir: Optional[Path] = typer.Option(
+        None, "--runs-dir", help="Where to write run_bundle_manifest.json (default: OUTPUT_ROOT/runs/<timestamp>)"
+    ),
+) -> None:
+    """Run Stage QC and Stages 1A to 4 on one workbook, in process."""
+    from .pipeline import run_pipeline
+
+    try:
+        result = run_pipeline(
+            input_xlsx,
+            output_root,
+            config_dir,
+            sheet=sheet,
+            start_from=start_from,
+            no_parquet=no_parquet,
+            runs_dir=runs_dir,
+            log=typer.echo,
+        )
+    except SystemExit as exc:
+        if exc.code in (None, 0):
+            raise
+        if not isinstance(exc.code, int):
+            typer.echo(f"Error: {exc.code}", err=True)
+        raise typer.Exit(code=exc.code if isinstance(exc.code, int) else 2)
+
+    typer.echo("Pipeline complete.")
+    if result["final"] is not None:
+        typer.echo(f"  Final deliverable : {result['final']}")
+    typer.echo(f"  Run bundle        : {result['runs_dir'] / 'run_bundle_manifest.json'}")
+
+
+@app.command()
 def validate(
     input_xlsx: Path = typer.Argument(..., help="Path to input Excel workbook"),
     config_dir: Optional[Path] = typer.Option(None, "--config-dir", "-c", help="Directory containing stage config YAMLs"),

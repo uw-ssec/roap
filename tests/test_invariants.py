@@ -2,13 +2,14 @@
 
 import io
 import math
-import subprocess
 import tempfile
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import pandas as pd
 import pytest
+
+from roap.pipeline import run_pipeline
 
 
 # Stage → target columns mapping (what each stage is ALLOWED to add/modify)
@@ -75,7 +76,7 @@ STAGE_TARGETS = {
 }
 
 
-# Where run_pipeline.sh writes each stage's output, relative to the output
+# Where run_pipeline writes each stage's output, relative to the output
 # root, and which file it hands to the next stage. 05 writes every row to
 # analysis_fields.csv but passes only the sample rows on to 06.
 STAGE_OUTPUT = {
@@ -238,16 +239,16 @@ def _one_file(root: Path, pattern: str) -> Path:
     return matches[0]
 
 
-@pytest.fixture(scope="module")
-def pipeline_run(bash_exe, tmp_path_factory) -> Path:
-    """One full run_pipeline.sh run; every stage test reads its files."""
-    out = tmp_path_factory.mktemp("invariants") / "outputs"
-    result = subprocess.run(
-        [bash_exe, "./run_pipeline.sh", EXAMPLE_XLSX.as_posix(), out.as_posix()],
-        capture_output=True, text=True, timeout=600,
-    )
-    assert result.returncode == 0, f"Pipeline failed: {result.stderr}"
+def _run(out: Path, input_xlsx: Path = EXAMPLE_XLSX) -> Path:
+    """Run the whole pipeline in process into ``out``."""
+    run_pipeline(input_xlsx, out, runs_dir=out / "runs" / "test", log=lambda _: None)
     return out
+
+
+@pytest.fixture(scope="module")
+def pipeline_run(tmp_path_factory) -> Path:
+    """One full pipeline run; every stage test reads its files."""
+    return _run(tmp_path_factory.mktemp("invariants") / "outputs")
 
 
 @pytest.mark.parametrize("stage_name", list(STAGE_OUTPUT))
@@ -348,7 +349,7 @@ def test_checker_catches_dropped_column_and_rows():
         assert_untouched_unchanged(df, df.iloc[:1], set(), "synthetic")
 
 
-def test_lat_lon_never_mutated(bash_exe):
+def test_lat_lon_never_mutated():
     """Specific regression test for the lat/lon overwrite bug (Vector #5)."""
     input_path = Path("examples/example_data.xlsx")
     input_df = pd.read_excel(input_path)
@@ -357,14 +358,10 @@ def test_lat_lon_never_mutated(bash_exe):
     assert "latitude_deg" in input_df.columns
     assert "longitude_deg" in input_df.columns
 
-    # Run full pipeline via run_pipeline.sh
+    # Run the full pipeline in process
     with tempfile.TemporaryDirectory() as tmpdir:
         output_dir = Path(tmpdir) / "outputs"
-        result = subprocess.run(
-            [bash_exe, "./run_pipeline.sh", input_path.as_posix(), output_dir.as_posix()],
-            capture_output=True, text=True, timeout=300
-        )
-        assert result.returncode == 0, f"Pipeline failed: {result.stderr}"
+        _run(output_dir, input_path)
 
         final_csv = output_dir / "oa_stage4_outputs" / "data" / "analysis_ready.csv"
         assert final_csv.exists(), "Final output not found"
@@ -380,7 +377,7 @@ def test_lat_lon_never_mutated(bash_exe):
         )
 
 
-def test_provenance_columns_never_mutated(bash_exe):
+def test_provenance_columns_never_mutated():
     """Provenance columns must not be silently overwritten."""
     input_path = Path("examples/example_data.xlsx")
     input_df = pd.read_excel(input_path)
@@ -395,11 +392,7 @@ def test_provenance_columns_never_mutated(bash_exe):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output_dir = Path(tmpdir) / "outputs"
-        result = subprocess.run(
-            [bash_exe, "./run_pipeline.sh", input_path.as_posix(), output_dir.as_posix()],
-            capture_output=True, text=True, timeout=300
-        )
-        assert result.returncode == 0
+        _run(output_dir, input_path)
 
         final_csv = output_dir / "oa_stage4_outputs" / "data" / "analysis_ready.csv"
         final_df = pd.read_csv(final_csv)
