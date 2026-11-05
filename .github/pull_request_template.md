@@ -76,6 +76,9 @@ Resolves #\<issue-number>
 - [ ] Change is within the sizing targets (200-400 lines), or the reason it
       cannot be split is explained above
 - [ ] Tests added/updated where needed
+- [ ] Golden baseline (`tests/golden/`) is unchanged, or every intended
+      difference is listed in the description and the fixtures were regenerated
+      with `pixi run python tools/golden_baseline.py`
 - [ ] Tests assert meaningful expected values rather than only "doesn't crash",
       and a human wrote or approved those values
 - [ ] Docs added/updated if applicable

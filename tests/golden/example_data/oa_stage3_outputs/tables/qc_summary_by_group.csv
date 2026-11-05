@@ -1,0 +1,5 @@
+cruise_id,transect_id,station_id,depth_round_m,sample_month,n_rows,n_dic_values_present,n_dic_checkable,n_dic_unit_missing,n_dic_unit_mismatch,n_dic_inconsistent,n_dic_inconsistent_robust,n_dic_nonpositive,n_any_negative_species,n_ph_values_present,n_ph_checkable,n_ph_strict_checkable,n_ph_best_scale_unexpected,n_ph_co2sys_scale_unexpected,n_ph_scale_mismatch,n_ph_diag_mismatch,n_ph_diag_mismatch_strict,n_ph_diag_mismatch_robust,n_stage2_replicate_conflict_carried,n_solver_unknown,n_carbon_input_pair_unknown,n_any_carbonate_issue,n_any_carbonate_issue_strict,n_any_stage3_review_issue,n_rows_with_incomplete_group_key,pct_dic_inconsistent,pct_ph_diag_mismatch,pct_any_carbonate_issue
+VISS-EX-2024,T1,V01,2.0,2024-03,5,5,5,0,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,7,0.0,0.0,0.0
+VISS-EX-2024,T1,V02,5.0,2024-03,5,5,5,0,0,1,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,1,1,1,7,20.0,0.0,20.0
+VISS-EX-2024,T1,V03,10.0,2024-03,5,5,5,0,0,1,0,0,1,5,5,5,0,0,0,0,0,0,0,0,0,1,1,1,7,20.0,0.0,20.0
+VISS-EX-2024,T1,V04,20.0,2024-03,5,5,5,0,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,7,0.0,0.0,0.0

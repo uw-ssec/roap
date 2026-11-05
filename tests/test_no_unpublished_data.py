@@ -15,6 +15,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ALLOWED_DATA_FILES = {"examples/example_data.xlsx"}
 
+# Pipeline output on the synthetic example workbook, kept as the golden
+# baseline (tests/golden/README.md). Derived from example_data.xlsx only.
+ALLOWED_DATA_DIRS = ("tests/golden/example_data/",)
+
 DATA_SUFFIXES = {".xlsx", ".xls", ".csv", ".parquet", ".nc", ".dat"}
 
 # Executed notebooks and exported reports embed measurement tables inline, so
@@ -43,6 +47,7 @@ def test_no_unexpected_data_files_tracked() -> None:
     # The prototype submodule is a separate repo with its own history; its
     # contents are covered by test_prototype_submodule_has_no_stored_outputs.
     data_files = {f for f in data_files if not f.startswith("references/")}
+    data_files = {f for f in data_files if not f.startswith(ALLOWED_DATA_DIRS)}
 
     unexpected = sorted(data_files - ALLOWED_DATA_FILES)
     assert not unexpected, f"Unpublished data files tracked in git: {unexpected}"
