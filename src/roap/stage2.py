@@ -15,14 +15,19 @@ Import as:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from .common import die, first_existing
+from .common import die, first_existing, md_table_from_df, normalize_columns, utc_stamp
 from .schema import DEFAULT_CONFIG
+from .stage_result import StageResult, json_text, package_versions
+
+if TYPE_CHECKING:
+    from .stage_config import StageConfig
 
 __all__ = [
+    "NOTEBOOK",
     "STAGE2_DEFAULTS",
     "ensure_stage2_dirs",
     "materialize_canonical_aliases",
@@ -35,7 +40,10 @@ __all__ = [
     "replicate_harmonise",
     "add_replicate_annotations",
     "add_conflict_annotations",
+    "run",
 ]
+
+NOTEBOOK = "06_stage2"
 
 
 # =============================================================================
@@ -1158,3 +1166,188 @@ def add_conflict_annotations(
         out[col] = out[col].fillna(False).astype("boolean")
 
     return out
+
+
+# =============================================================================
+# Stage run (#42)
+# =============================================================================
+
+_REPLICATE_FLAGS = (
+    "flag_replicate_metadata_conflict",
+    "flag_replicate_provenance_conflict",
+    "flag_replicate_qc_conflict",
+    "flag_replicate_source_conflict",
+    "flag_replicate_other_conflict",
+    "flag_replicate_any_conflict",
+    "flag_replicate_sd_exceeded",
+)
+
+
+def run(
+    df: pd.DataFrame,
+    stage_config: "StageConfig",
+    *,
+    source: Optional[str] = None,
+    depth_round_decimals: int = 1,
+) -> StageResult:
+    """Run Stage 2 on Stage 1B's Sample-only frame; no disk IO.
+
+    ``source`` labels the input in the frame's ``source_file_stage2`` column,
+    the report and the run bundle. Raises ``ValueError`` for another Stage's
+    config or a negative ``depth_round_decimals``; a missing required column
+    stops with ``SystemExit`` as before.
+    """
+    if stage_config.stage != "stage2":
+        raise ValueError(f"Stage 2 needs the stage2 config, got {stage_config.stage}.")
+    if depth_round_decimals < 0:
+        raise ValueError(f"DEPTH_ROUND_DECIMALS must be >= 0, got {depth_round_decimals}")
+    config = stage_config.config
+    required_cols = config.get(
+        "required_stage2_input_columns",
+        config.get("required_stage2_columns", config.get("required_stage1b_columns", [])),
+    )
+    expected_cols = config.get("expected_stage2_columns", config.get("expected_provenance_columns", []))
+    notes: List[str] = []
+
+    df = normalize_columns(df.copy())
+    df["source_file_stage2"] = str(source) if source is not None else ""
+    df["stage2_processed_utc"] = utc_stamp()
+    for dcol in ["sample_date", "sample_date_dt", "date", "datetime"]:
+        if dcol in df.columns:
+            df[dcol] = pd.to_datetime(df[dcol], errors="coerce", utc=True)
+
+    df, alias_resolution = materialize_canonical_aliases(df, config["canonical_aliases"], notes)
+    ensure_required_columns(df, required_cols)
+
+    presence_df = make_presence_table(df, required=required_cols, expected=expected_cols)
+    missing_opt = presence_df.loc[(~presence_df["required"]) & (~presence_df["present"]), "column"].tolist()
+    if missing_opt:
+        notes.append("Optional expected columns not found: " + ", ".join(missing_opt))
+
+    df = add_time_and_depth_keys(
+        df, notes, depth_round_decimals=depth_round_decimals, depth_bin_m=config.get("depth_bin_m", 1.0)
+    )
+    inventory_df = make_column_inventory(df)
+
+    dup_rows, dup_summary, dup_keys_used = duplicate_check(df, config["duplicate_keys"])
+    df = add_duplicate_annotations(df, dup_keys_used)
+
+    rep_mean, rep_mean_sd, consistency_df, disagree_df, rep_keys_used, mean_vars, nrep = replicate_harmonise(
+        df,
+        requested_keys=config["replicate_group_keys"],
+        mean_whitelist=config["replicate_mean_vars"],
+        consistency_cols=config["replicate_consistency_check_columns"],
+        sd_thresholds=config["replicate_sd_thresholds"],
+        conflict_class_map=config["replicate_conflict_field_classes"],
+    )
+    df = add_replicate_annotations(df, nrep, rep_keys_used)
+    df = add_conflict_annotations(df, consistency_df, disagree_df, rep_keys_used)
+
+    def flag_count(col: str) -> int:
+        return int((df[col] == True).sum()) if col in df.columns else 0  # noqa: E712
+
+    manifest = {
+        "notebook": NOTEBOOK,
+        "generated_utc": utc_stamp(),
+        "input_csv": source,
+        "config_source": stage_config.source,
+        "config_warnings": list(stage_config.warnings),
+        "parameters": {"DEPTH_ROUND_DECIMALS": depth_round_decimals},
+        "alias_resolution": alias_resolution,
+        "duplicate_keys_used": dup_keys_used,
+        "replicate_group_keys_used": rep_keys_used,
+        "replicate_mean_vars_used": mean_vars,
+        "replicate_sd_thresholds": config["replicate_sd_thresholds"],
+        "row_counts": {
+            "rows_loaded": int(len(df)),
+            "duplicate_rows": int(len(dup_rows)),
+            "duplicate_groups": int(len(dup_summary)),
+            "replicate_groups": int(len(rep_mean_sd)),
+            "consistency_conflicts": int(len(consistency_df)),
+            "sd_failures": int(len(disagree_df)),
+        },
+        "flag_counts": {
+            col: flag_count(col) for col in ("flag_duplicate", "flag_has_replicates", *_REPLICATE_FLAGS)
+        },
+        "notes": notes,
+        "package_versions": package_versions(),
+    }
+
+    conflict_rows = "\n".join(
+        f"| {label} | {flag_count(col):,} |"
+        for label, col in zip(
+            ("metadata conflict", "provenance conflict", "qc conflict", "source conflict",
+             "other conflict", "any conflict", "SD threshold exceeded"),
+            _REPLICATE_FLAGS,
+        )
+    )
+    notes_md = "\n".join(f"- {n}" for n in notes) if notes else "- (none)"
+    report = f"""# Stage 2 Preprocessing Report
+
+**Generated:** {utc_stamp()}
+**Input:** `{source}`
+**Rows:** {len(df):,}  **Columns:** {df.shape[1]:,}
+
+## What this stage does
+Validates Stage 1B canonical fields, adds grouping helpers
+(`sample_month`, `sample_day`, `depth_round_m`, `depth_bin_m`), checks
+duplicates, and harmonises replicates. Does **not** rebuild `ph_best`,
+`ph_co2sys`, `ta_best_umolkg`, `pco2_best_uatm`, or `dic_best_umol_kg`.
+
+## Canonical field presence
+{md_table_from_df(presence_df, max_rows=200)}
+
+## Duplicate check
+- Keys used: `{dup_keys_used}`
+- Duplicate rows: **{len(dup_rows):,}**
+- Duplicate groups: **{len(dup_summary):,}**
+
+## Replicate harmonisation
+- Group keys used: `{rep_keys_used}`
+- Variables averaged: `{mean_vars}`
+- Replicate groups: **{len(rep_mean_sd):,}**
+- Consistency conflicts: **{len(consistency_df):,}**
+- SD-threshold failures: **{len(disagree_df):,}**
+- SD thresholds used: `{config['replicate_sd_thresholds']}`
+
+## Conflict / SD flags (row counts)
+| Flag | Rows |
+|------|-----:|
+{conflict_rows}
+
+## Column inventory (top 30 by missingness)
+{md_table_from_df(inventory_df.head(30), max_rows=200)}
+
+## Reference context
+The replicate SD warning thresholds are based on first pass GOA ON
+weather quality targets commonly used for ocean acidification observing:
+approximately ±0.02 pH units and ±10 µmol kg⁻¹ for total alkalinity or DIC.
+These thresholds are used here as screening thresholds, not as formal
+uncertainty estimates.
+
+## Notes
+{notes_md}
+
+## Main outputs
+- `data/enhanced.csv`: Stage 3 reads this
+- `tables/replicate_means_sd.csv`: replicate means + SD
+"""
+    return StageResult(
+        stage="stage2",
+        data={"data/enhanced.csv": df},
+        tables={
+            "tables/column_inventory.csv": inventory_df,
+            "tables/canonical_presence.csv": presence_df,
+            "tables/duplicate_rows.csv": dup_rows,
+            "tables/duplicate_summary.csv": dup_summary,
+            "tables/replicate_means_sd.csv": rep_mean_sd,
+            "tables/replicate_consistency.csv": consistency_df,
+            "tables/replicate_disagreement.csv": disagree_df,
+        },
+        reports={"reports/report.md": report},
+        texts={"logs/effective_config.json": json_text(config)},
+        manifest=manifest,
+        input_file=source,
+        config_files=[stage_config.source],
+        bundle_name=NOTEBOOK,
+    )
