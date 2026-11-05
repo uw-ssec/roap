@@ -198,7 +198,7 @@ def test_notebook_04_rerun_without_parquet_leaves_old_parquet_out(tmp_path):
     """
     input_csv = tmp_path / "derived.csv"
     input_csv.write_text(
-        "sample_id,sample_date,station_id,ta,ph\nS001,2024-01-01,ST1,2200,8.0\n", encoding="utf-8"
+        "sample_id,sample_date,station_id,ta,ph,row_role\nS001,2024-01-01,ST1,2200,8.0,SAMPLE\n", encoding="utf-8"
     )
     out_dir = tmp_path / "oa_stage1a_outputs"
     first = _papermill("04_stage1a.ipynb", tmp_path / "04.first.ipynb", "INPUT_CSV", str(input_csv), "OUT_DIR", str(out_dir))
@@ -213,7 +213,7 @@ def test_notebook_04_rerun_without_parquet_leaves_old_parquet_out(tmp_path):
     for parquet in parquets:
         os.utime(parquet, (future, future))
     input_csv.write_text(
-        "sample_id,sample_date,station_id,ta,ph\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0\n", encoding="utf-8"
+        "sample_id,sample_date,station_id,ta,ph,row_role\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0,SAMPLE\n", encoding="utf-8"
     )
     second = _papermill(
         "04_stage1a.ipynb", out_dir / "04.second.ipynb",
@@ -257,7 +257,7 @@ def test_notebook_04_same_kernel_rerun_leaves_old_parquet_out(tmp_path, monkeypa
     monkeypatch.chdir(REPO_ROOT / "notebooks")
     monkeypatch.delenv("GIT_COMMIT", raising=False)
     input_csv = tmp_path / "derived.csv"
-    input_csv.write_text("sample_id,sample_date,station_id,ta,ph\nS001,2024-01-01,ST1,2200,8.0\n", encoding="utf-8")
+    input_csv.write_text("sample_id,sample_date,station_id,ta,ph,row_role\nS001,2024-01-01,ST1,2200,8.0,SAMPLE\n", encoding="utf-8")
     out_dir = tmp_path / "oa_stage1a_outputs"
     kernel: dict = {"display": lambda *a, **k: None}
 
@@ -265,7 +265,7 @@ def test_notebook_04_same_kernel_rerun_leaves_old_parquet_out(tmp_path, monkeypa
     parquets = sorted(out_dir.rglob("*.parquet"))
     assert parquets, "first run should write Parquet"
     input_csv.write_text(
-        "sample_id,sample_date,station_id,ta,ph\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0\n", encoding="utf-8"
+        "sample_id,sample_date,station_id,ta,ph,row_role\nNEW_RUN_ONLY,2024-01-01,ST1,2200,8.0,SAMPLE\n", encoding="utf-8"
     )
     _replay_code_cells("04_stage1a.ipynb", kernel, INPUT_CSV=str(input_csv), OUT_DIR=str(out_dir), NO_PARQUET=True)
 

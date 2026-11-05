@@ -76,7 +76,7 @@ def test_run_leaves_the_input_frame_unchanged() -> None:
 
 
 def test_duplicate_key_override_is_used_and_checked() -> None:
-    df = pd.DataFrame({"sample_id": ["A", "A", "B"], "ta": [2200, 2200, 2100]})
+    df = pd.DataFrame({"sample_id": ["A", "A", "B"], "ta": [2200, 2200, 2100], "row_role": "SAMPLE"})
     result = stage1a.run(df, load_stage_config("stage1a"), duplicate_keys=["sample_id"])
     assert result.manifest["policy"]["duplicate_keys_used"] == ["sample_id"]
     assert result.manifest["row_counts"]["possible_duplicate_rows"] == 2

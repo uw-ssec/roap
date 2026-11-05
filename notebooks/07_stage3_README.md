@@ -17,6 +17,10 @@ its species (CO₂(aq) + HCO₃⁻ + CO₃²⁻)? Does observed pH agree with
 CO2SYS-calculated pH within tolerance? Are the pH scales and units
 self-consistent?
 
+Every row gets the row-wise flags. Only Sample rows (`row_role == SAMPLE`, #44)
+form the robust (MAD) outlier population and count in the summary and
+`qc_summary_by_group.csv`; CRM and Standard rows never get a robust flag.
+
 ---
 
 ## 1. Role in the pipeline

@@ -89,6 +89,7 @@ def test_replicate_grouping_does_not_merge_different_sample_ids() -> None:
     """Same station, depth, and day should not merge distinct sample IDs."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "record_id": ["R001", "R002"],
             "sample_id": ["S001", "S002"],
             "sample_date": ["2024-03-01T10:00:00", "2024-03-01T10:05:00"],
@@ -113,6 +114,7 @@ def test_record_id_does_not_create_replicate_metadata_conflict() -> None:
     """Valid replicate rows may have different record_id values."""
     df = pd.DataFrame(
         {
+            "row_role": "SAMPLE",
             "record_id": ["R001", "R002"],
             "sample_id": ["S001", "S001"],
             "sample_date": ["2024-03-01T10:00:00", "2024-03-01T10:02:00"],

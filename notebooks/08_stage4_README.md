@@ -336,6 +336,13 @@ end-to-end with no manual path edits at the default parameters.
   column never gets the `duplicate_complete_key` flag (it gets `missing_key`
   instead). The Stage 2 advisory duplicate flag is the loose counterpart for
   rows that _look_ like duplicates even with missing keys.
+- **Only Samples are duplicates (#44).** `detect_duplicates` compares Sample
+  rows only. Inputs from before `row_role` existed use the deprecated
+  `row_classification` labels; an input with neither compares every row.
+- **A failed carbonate calculation stops Stage 4 (#44).** When
+  `carbonate_calc.enabled` is true (or `NO_CARBONATE_CALC = False`) and PyCO2SYS
+  fails, Stage 4 exits with the error instead of writing an `analysis_ready.csv`
+  without the requested chemistry.
 - **The unit-equivalents allowlist is hand-maintained.** New unit strings
   ("µmol·kg⁻¹" with a Unicode middle dot, etc.) need to be added to
   `unit_equivalents` or normalised to one of the existing entries by

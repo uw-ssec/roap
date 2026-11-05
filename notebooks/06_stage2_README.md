@@ -16,6 +16,10 @@ duplicates, and computes per-replicate-group means + standard deviations. Flags
 rows whose group has a conflict in metadata / QC / provenance / source or whose
 metric SD exceeds the GOA-ON "weather" precision threshold.
 
+Only Sample rows (`row_role == SAMPLE`) are grouped (#44). CRM and Standard rows
+stay in every output but never join a duplicate or replicate group, its means
+and SDs, or its conflict checks; their group flags stay False.
+
 ---
 
 ## 1. Role in the pipeline

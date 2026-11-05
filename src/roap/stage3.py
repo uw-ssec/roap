@@ -45,6 +45,7 @@ from .common import (
     safe_str_series,
     utc_stamp,
 )
+from . import row_roles
 from .schema import DEFAULT_CONFIG, assert_ph_scale_consistency, normalize_carbonate_unit, normalize_ph_scale
 from .stage_result import StageResult, json_text, package_versions
 
@@ -633,8 +634,14 @@ def _dic_block(
     df: pd.DataFrame,
     thr: CarbonateIntegrityThresholds,
     out: pd.DataFrame,
+    sample: Optional[pd.Series] = None,
 ) -> Tuple[pd.DataFrame, pd.Series, bool]:
-    """Compute DIC species sum diagnostics."""
+    """Compute DIC species sum diagnostics.
+
+    ``sample`` limits the robust (MAD) population to Sample rows (#44); the
+    other rows get no robust flag. ``None`` uses every row.
+    """
+    sample = pd.Series(True, index=df.index) if sample is None else sample
     dic_cols = [
         "dic_best_umol_kg",
         "co2aq_calc_umol_kg",
@@ -747,8 +754,9 @@ def _dic_block(
     out["flag_dic_inconsistent"] = (checkable & (diff.abs() > tol)).astype("boolean")
     out["flag_dic_inconsistent_robust"] = (
         checkable
+        & sample
         & robust_outlier_flags(
-            diff.where(checkable),
+            diff.where(checkable & sample),
             mad_k=thr.dic_mad_k,
             min_n=5,
         ).fillna(False)
@@ -809,8 +817,13 @@ def _ph_block(
     thr: CarbonateIntegrityThresholds,
     out: pd.DataFrame,
     accepted_ph_scales: Sequence[str] = ("total",),
+    sample: Optional[pd.Series] = None,
 ) -> Tuple[pd.DataFrame, pd.Series, bool]:
-    """Compute observed versus calculated pH diagnostics."""
+    """Compute observed versus calculated pH diagnostics.
+
+    ``sample`` limits the robust (MAD) population as in :func:`_dic_block`.
+    """
+    sample = pd.Series(True, index=df.index) if sample is None else sample
     have_ph = "ph_best" in df.columns and "ph_co2sys" in df.columns
     out["ph_columns_present"] = pd.Series(have_ph, index=df.index, dtype="boolean")
 
@@ -921,8 +934,9 @@ def _ph_block(
     ).astype("boolean")
     out["flag_ph_diag_mismatch_robust"] = (
         vals_ok
+        & sample
         & robust_outlier_flags(
-            harmonized.where(vals_ok),
+            harmonized.where(vals_ok & sample),
             mad_k=thr.ph_mad_k,
             min_n=5,
         ).fillna(False)
@@ -1011,16 +1025,22 @@ def carbonate_integrity_checks(
     thr: CarbonateIntegrityThresholds,
     accepted_ph_scales: Optional[Sequence[str]] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any], pd.DataFrame, pd.DataFrame]:
-    """Run all row wise carbonate system integrity diagnostics."""
+    """Run all row wise carbonate system integrity diagnostics.
+
+    Every row gets the row-wise flags (informational). Only Sample rows (#44)
+    form the robust (MAD) outlier population and count in the summary.
+    """
     accepted_ph_scales = accepted_ph_scales or ("total",)
     out = pd.DataFrame(index=df.index)
+    sample = row_roles.is_sample(df)
 
-    dic_mismatches, _, _ = _dic_block(df, thr, out)
+    dic_mismatches, _, _ = _dic_block(df, thr, out, sample=sample)
     ph_mismatches, _, _ = _ph_block(
         df,
         thr,
         out,
         accepted_ph_scales=accepted_ph_scales,
+        sample=sample,
     )
 
     for col in [
@@ -1044,7 +1064,7 @@ def carbonate_integrity_checks(
         return _flag_column(out, col)
 
     def _count_true(col: str) -> int:
-        return _count_true_column(out, col)
+        return _count_true_column(out.loc[sample], col)
 
     def _first_bool(col: str) -> bool:
         return _first_bool_column(out, col)
@@ -1188,7 +1208,8 @@ def build_qc_summary(
     df: pd.DataFrame,
     requested_keys: Sequence[str],
 ) -> Tuple[pd.DataFrame, List[str]]:
-    """Build per group counts of Stage 3 diagnostics."""
+    """Build per group counts of Stage 3 diagnostics over Sample rows only (#44)."""
+    df = df.loc[row_roles.is_sample(df)]
     keys = [key for key in requested_keys if key in df.columns]
     agg = {name: spec for name, spec in _AGG_MAP.items() if spec[0] in df.columns}
 

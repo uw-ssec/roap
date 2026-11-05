@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
+from . import row_roles
 from .common import die, first_existing, load_config as load_generic_config
 
 __all__ = [
@@ -1083,10 +1084,15 @@ def choose_duplicate_keys(
 
 
 def add_duplicate_flags(df: pd.DataFrame, dup_keys: List[str]) -> int:
-    """Flag possible duplicates only among rows with complete duplicate keys."""
+    """Flag possible duplicates among Sample rows with complete duplicate keys.
+
+    Only Samples are grouped (#44): CRM and Standard rows are never flagged as
+    duplicates or as having an incomplete key, but stay in ``df``.
+    """
+    sample = row_roles.is_sample(df)
     if not dup_keys:
         df["flag_possible_duplicate"] = pd.Series(False, index=df.index, dtype="boolean")
-        df["flag_duplicate_key_incomplete"] = pd.Series(True, index=df.index, dtype="boolean")
+        df["flag_duplicate_key_incomplete"] = sample.astype("boolean")
         return 0
 
     missing = [col for col in dup_keys if col not in df.columns]
@@ -1099,14 +1105,15 @@ def add_duplicate_flags(df: pd.DataFrame, dup_keys: List[str]) -> int:
         complete_key &= _series_has_value(df[key])
 
     dup_mask = pd.Series(False, index=df.index)
+    groupable = complete_key & sample
 
-    if complete_key.any():
-        dup_mask.loc[complete_key] = df.loc[complete_key].duplicated(
+    if groupable.any():
+        dup_mask.loc[groupable] = df.loc[groupable].duplicated(
             subset=dup_keys,
             keep=False,
         )
 
     df["flag_possible_duplicate"] = dup_mask.astype("boolean")
-    df["flag_duplicate_key_incomplete"] = (~complete_key).astype("boolean")
+    df["flag_duplicate_key_incomplete"] = (~complete_key & sample).astype("boolean")
 
     return int(dup_mask.sum())

@@ -27,8 +27,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def test_stage2_user_config_key_reaches_effective_config(tmp_path: Path) -> None:
     input_csv = tmp_path / "analysis_ready_samples.csv"
     input_csv.write_text(
-        "sample_id,sample_date,station_id,depth_m,ta_best_umolkg,ph_best\n"
-        "S001,2024-01-01,ST1,5.0,2200,8.0\n",
+        "sample_id,sample_date,station_id,depth_m,ta_best_umolkg,ph_best,row_role\n"
+        "S001,2024-01-01,ST1,5.0,2200,8.0,SAMPLE\n",
         encoding="utf-8",
     )
     config = tmp_path / "06_stage2.yaml"
