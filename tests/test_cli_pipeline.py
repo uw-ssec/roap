@@ -123,3 +123,33 @@ def test_qc_config_sheet_wins_over_caller_sheet(tmp_path: Path) -> None:
     # Starting after Stage QC hands off the config's sheet too.
     run_pipeline(workbook, out_root, cfg_dir, start_from="04", runs_dir=out_root / "runs" / "s04", **quiet)
     assert len(pd.read_csv(out_root / FINAL_REL)) == 27
+
+
+def test_late_resume_ignores_invalid_qc_config(tmp_path: Path) -> None:
+    """A resume from 05 or later never loads the QC config.
+
+    Those runs use no QC sheet or handoff, so a QC config the pipeline would
+    reject (here, an unmet version requirement) must not abort them. A
+    resume from 04 still uses the QC config for the handoff and does reject it.
+    """
+    import shutil
+
+    out_root = tmp_path / "out"
+    quiet = {"log": lambda _: None}
+    run_pipeline(EXAMPLE_XLSX, out_root, runs_dir=out_root / "runs" / "full", **quiet)
+
+    cfg_dir = tmp_path / "configs"
+    cfg_dir.mkdir()
+    shutil.copy(REPO_ROOT / "configs" / "crm_certified_values.yaml", cfg_dir)
+    (cfg_dir / "02_ta_ph_qc.yaml").write_text(
+        'compatible_pipeline_version: ">=9999.1.0"\nparameters: {}\n', encoding="utf-8"
+    )
+
+    for start in ("05", "06", "07", "08"):
+        run_pipeline(
+            EXAMPLE_XLSX, out_root, cfg_dir, start_from=start, runs_dir=out_root / "runs" / start, **quiet
+        )
+    assert len(pd.read_csv(out_root / FINAL_REL)) == 27
+
+    with pytest.raises(SystemExit, match="(?i)requires pipeline version"):
+        run_pipeline(EXAMPLE_XLSX, out_root, cfg_dir, start_from="04", runs_dir=out_root / "runs" / "s04", **quiet)

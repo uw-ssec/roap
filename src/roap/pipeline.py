@@ -229,10 +229,15 @@ def run_pipeline(
 
     # The QC config's SHEET wins over ``sheet`` (file over caller, as in
     # notebook 02). Resolve it once so the QC read, the manifest and the
-    # Stage 1A handoff agree, also when the run starts after Stage QC.
-    qc_cfg_path = _stage_config_path(cfg_dir, _STAGES["02"][0], lambda _msg: None)
-    qc_cfg = load_stage_config("qc", qc_cfg_path) if start_from == "02" or qc_cfg_path else None
-    qc_sheet = _qc_sheet(qc_cfg, sheet) if qc_cfg is not None else sheet
+    # Stage 1A handoff agree, also for ``--start-from 04``. Runs starting
+    # at 05 or later use neither, so they never load the QC config.
+    qc_cfg = None
+    qc_sheet = sheet
+    if "02" in todo or "04" in todo:
+        qc_cfg_path = _stage_config_path(cfg_dir, _STAGES["02"][0], lambda _msg: None)
+        if start_from == "02" or qc_cfg_path:
+            qc_cfg = load_stage_config("qc", qc_cfg_path)
+            qc_sheet = _qc_sheet(qc_cfg, sheet)
 
     for stage in todo:
         stem, _ = _STAGES[stage]
