@@ -25,17 +25,27 @@ writes a run bundle you can verify later.
 
 ## Quickstart
 
-Install [Pixi](https://pixi.sh/latest/#installation), then clone the repository
-and install the environment. Pixi manages Python 3.11 and every dependency.
+Install [Pixi](https://pixi.sh/latest/#installation) 0.83 or newer (run
+`pixi self-update` to upgrade an older install). Then clone the repository with
+its submodule and install the locked environment. Pixi manages Python 3.11 and
+every dependency.
 
 ```bash
-git clone https://github.com/uw-ssec/roap.git
+git clone --recurse-submodules https://github.com/uw-ssec/roap.git
 cd roap
-pixi install
+pixi install --locked
 ```
 
-On Windows, run the pipeline from Git Bash, because `run_pipeline.sh` is a Bash
-script.
+Older Pixi versions misread `pixi.lock` and reject `--locked` with "lock file
+not up-to-date", on every operating system. Upgrade Pixi rather than switching
+to `--frozen`: `--frozen` skips the check that the lock file matches
+`pixi.toml`.
+
+On Windows, run the pipeline and the tests from Git Bash, because
+`run_pipeline.sh` is a Bash script. From PowerShell or cmd, the task can exit
+with code 127 if Git Bash is absent from PATH; running from Git Bash provides
+the required environment. Use Git for Windows' Bash, not WSL's
+`C:\Windows\System32\bash.exe`.
 
 ### 1. Command line
 
@@ -146,20 +156,35 @@ gives these `analysis_audit_status` values in `analysis_ready.csv`:
 - **20 samples:** 16 PASS, 3 FAIL (injected bad rows) and 1 REVIEW (borderline)
 - **7 reference rows:** 4 `CRM_QC` and 3 `STD_QC`
 
+Matching these counts, and a clean `roap verify-bundle`, shows the pipeline ran
+and its outputs are intact. It does not show the results are scientifically
+correct for your data. When trying a real lab workbook, compare units, reference
+values, verdicts and carbonate outputs against your own manual QC and
+independently checked chemistry. `roap validate` can't do this yet: it only
+reads the first sheet and reports `status: stub`, so an exit code of 0 doesn't
+mean the workbook passed validation.
+
 ## Troubleshooting
 
-| Problem                              | Solution                                                        |
-| ------------------------------------ | --------------------------------------------------------------- |
-| `ModuleNotFoundError: roap`          | Run `pixi install` from the repository root                     |
-| `run_pipeline.sh: command not found` | Use Git Bash on Windows; run `chmod +x run_pipeline.sh` on Unix |
-| GUI won't open                       | Run `pixi install`, then `pixi run python tools/roap_app.py`    |
-| Carbonate calculation fails          | PyCO2SYS 1.x is required; `pixi install` provides it            |
-| Config version mismatch              | Update `compatible_pipeline_version` in that config's YAML      |
+| Problem                                                | Solution                                                        |
+| ------------------------------------------------------ | --------------------------------------------------------------- |
+| `ModuleNotFoundError: roap`                            | Run `pixi install` from the repository root                     |
+| `requires pixi '>=0.83'` or `lock file not up-to-date` | Run `pixi self-update`, then `pixi install --locked`            |
+| `pixi run pipeline` exits with 127 on Windows          | Run it from Git Bash                                            |
+| `run_pipeline.sh: command not found`                   | Use Git Bash on Windows; run `chmod +x run_pipeline.sh` on Unix |
+| GUI won't open                                         | Run `pixi install`, then `pixi run python tools/roap_app.py`    |
+| Carbonate calculation fails                            | PyCO2SYS 1.x is required; `pixi install` provides it            |
+| Config version mismatch                                | Update `compatible_pipeline_version` in that config's YAML      |
 
 ## For Developers
 
-- `pixi run test`: the full test suite. Some tests need the prototype submodule:
-  `git submodule update --init`
+- `pixi run test`: the full test suite. Some tests need the prototype submodule.
+  If you cloned without `--recurse-submodules`, run
+  `git submodule update --init --recursive`
+- Some tests start `pixi` and `run_pipeline.sh` in child processes, so Pixi and
+  Bash must be on the PATH the tests inherit. On Windows, run the tests from Git
+  Bash. Pointing an IDE such as PyCharm at the Pixi Python interpreter doesn't
+  put Pixi or Bash on that PATH
 - `pixi run pre-commit-all`: formatting, spelling, workflow and secret-scanning
   hooks. Run it before every PR
 - `pixi run pytest tests/test_invariants.py -v`: the invariant tests only
