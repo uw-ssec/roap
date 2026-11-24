@@ -42,9 +42,10 @@ to `--frozen`: `--frozen` skips the check that the lock file matches
 `pixi.toml`.
 
 On Windows, run the pipeline and the tests from Git Bash, because
-`run_pipeline.sh` is a Bash script. From PowerShell or cmd, `pixi run pipeline`
-exits with code 127 because it can't find Bash. Use Git for Windows' Bash, not
-WSL's `C:\Windows\System32\bash.exe`.
+`run_pipeline.sh` is a Bash script. From PowerShell or cmd, the task can exit
+with code 127 if Git Bash is absent from PATH; running from Git Bash provides
+the required environment. Use Git for Windows' Bash, not WSL's
+`C:\Windows\System32\bash.exe`.
 
 ### 1. Command line
 
